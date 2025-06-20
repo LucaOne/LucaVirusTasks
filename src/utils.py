@@ -143,7 +143,7 @@ def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    if args.n_gpu > 0:
+    if args.n_gpu > 0 and torch.cuda.is_available():
         torch.cuda.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
 
@@ -509,33 +509,39 @@ def available_gpu_id():
     计算可用的GPU id
     :return:
     '''
-    pynvml.nvmlInit()
-    if not torch.cuda.is_available():
-        print("GPU not available")
+    try:
+        pynvml.nvmlInit()
+        if not torch.cuda.is_available():
+            print("GPU not available")
+            return -1
+        # 获取GPU数量
+        device_count = pynvml.nvmlDeviceGetCount()
+        max_available_gpu = -1
+        max_available_rate = 0
+
+        # 遍历所有GPU并检查可用性
+        for i in range(device_count):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            memory_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            # 假设如果GPU利用率小于某个阈值（例如10%），我们认为这个GPU目前是空闲的
+            if utilization.gpu < 10 and max_available_rate < 100 - utilization.gpu:
+                max_available_rate = 100 - utilization.gpu
+                max_available_gpu = i
+        # 打印可用的GPU ID
+        if max_available_gpu > -1:
+            print("Available GPU ID: %d, Free Rate: %0.2f%%" % (max_available_gpu, max_available_rate))
+        else:
+            print("No Available GPU!")
+
+        # Shutdown NVML
+        pynvml.nvmlShutdown()
+        return max_available_gpu
+    except ImportError:
+        print("pynvml is not installed, available_gpu_id is not supported on non-NVIDIA GPUs.")
         return -1
-    # 获取GPU数量
-    device_count = pynvml.nvmlDeviceGetCount()
-    max_available_gpu = -1
-    max_available_rate = 0
-
-    # 遍历所有GPU并检查可用性
-    for i in range(device_count):
-        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-        memory_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-        utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
-        # 假设如果GPU利用率小于某个阈值（例如10%），我们认为这个GPU目前是空闲的
-        if utilization.gpu < 10 and max_available_rate < 100 - utilization.gpu:
-            max_available_rate = 100 - utilization.gpu
-            max_available_gpu = i
-    # 打印可用的GPU ID
-    if max_available_gpu > -1:
-        print("Available GPU ID: %d, Free Rate: %0.2f%%" % (max_available_gpu, max_available_rate))
-    else:
-        print("No Available GPU!")
-
-    # Shutdown NVML
-    pynvml.nvmlShutdown()
-    return max_available_gpu
+    except Exception:
+        return -1
 
 
 def eval_metrics(output_mode, truths, preds, threshold=0.5):

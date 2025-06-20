@@ -175,17 +175,11 @@ def predict_probs(
         probs = []
         for cur_batch_features in batch_features:
             cur_probs = model(**cur_batch_features)[1]
-            if cur_probs.is_cuda:
-                cur_probs = cur_probs.detach().cpu().numpy()
-            else:
-                cur_probs = cur_probs.detach().numpy()
+            cur_probs = cur_probs.detach().cpu().numpy()
             probs.append(cur_probs)
     else:
         probs = model(**batch_features)[1]
-        if probs.is_cuda:
-            probs = probs.detach().cpu().numpy()
-        else:
-            probs = probs.detach().numpy()
+        probs = probs.detach().cpu().numpy()
     return batch_info, probs, seq_lens
 
 
@@ -223,10 +217,10 @@ def predict_token_level_binary_class(
                 info[2],
                 info[3],
                 info[4],
-                info[6],
-                [v[0] for v in probs[idx]],
-                [v[0] for v in preds[idx]],
-                [label_id_2_name[v[0]] for v in preds[idx]]
+                info[5],
+                probs[idx][0],
+                preds[idx][0],
+                label_id_2_name[preds[idx][0]]
             ]
             if len(info) > 6:
                 cur_res += info[6:]
@@ -236,9 +230,9 @@ def predict_token_level_binary_class(
                 info[1],
                 info[2],
                 info[3],
-                [v[0] for v in probs[idx]],
-                [v[0] for v in preds[idx]],
-                [label_id_2_name[v[0]] for v in preds[idx]]
+                probs[idx][0],
+                preds[idx][0],
+                label_id_2_name[preds[idx][0]]
             ]
             if len(info) > 4:
                 cur_res += info[4:]
@@ -1336,153 +1330,183 @@ if __name__ == "__main__":
     #     save_dir=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # )
     if run_args.input_file is not None and os.path.exists(run_args.input_file):
-        exists_ids = set()
-        exists_res = []
-        if os.path.exists(run_args.save_path):
-            print("save_path=%s exists." % run_args.save_path)
-            if run_args.input_mode == "triple":
-                for row in csv_reader(run_args.save_path, header=True, header_filter=True):
-                    if len(row) < 8:
-                        continue
-                    exists_ids.add(row[0] + "_" + row[1] + "_" + row[2])
-                    exists_res.append(row)
-                print("exists records: %d" % len(exists_res))
-            elif run_args.input_mode == "pair":
-                for row in csv_reader(run_args.save_path, header=True, header_filter=True):
-                    if len(row) < 6:
-                        continue
-                    exists_ids.add(row[0] + "_" + row[1])
-                    exists_res.append(row)
-                print("exists records: %d" % len(exists_res))
-            else:
-                for row in csv_reader(run_args.save_path, header=True, header_filter=True):
-                    if len(row) < 4:
-                        continue
-                    exists_ids.add(row[0])
-                    exists_res.append(row)
-                print("exists records: %d" % len(exists_res))
-        elif not os.path.exists(os.path.dirname(run_args.save_path)):
-            os.makedirs(os.path.dirname(run_args.save_path))
-        with open(run_args.save_path, "w") as wfp:
-            writer = csv.writer(wfp)
-            if run_args.input_mode == "triple":
-                if run_args.task_type == "multi_class" and run_args.topk is not None and run_args.topk > 1 and run_args.task_level_type == "seq_level":
-                    header = [
-                        "seq_id_a", "seq_id_b", "seq_id_c",
-                        "seq_a", "seq_b", "seq_c",
-                        "top1_prob", "top1_label_index", "top1_label",
-                        "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
-                    ]
-                else:
-                    header = [
-                        "seq_id_a", "seq_id_b", "seq_id_c",
-                        "seq_a", "seq_b", "seq_c",
-                        "prob", "label_index", "label"
-                    ]
-            elif run_args.input_mode == "pair":
-                if run_args.task_type == "multi_class" and run_args.topk is not None and run_args.topk > 1 and run_args.task_level_type == "seq_level":
-                    header = [
-                        "seq_id_a", "seq_id_b",
-                        "seq_a", "seq_b",
-                        "top1_prob", "top1_label_index", "top1_label",
-                        "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
-                    ]
-                else:
-                    header = [
-                        "seq_id_a", "seq_id_b",
-                        "seq_a", "seq_b",
-                        "prob", "label_index", "label"
-                    ]
-            else:
-                if run_args.task_type == "multi_class" \
-                        and run_args.topk is not None \
-                        and run_args.topk > 1 \
-                        and run_args.task_level_type == "seq_level":
-                    header = [
-                        "seq_id", "seq",
-                        "top1_prob", "top1_label_index", "top1_label",
-                        "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
-                    ]
-                else:
-                    header = [
-                        "seq_id", "seq",
-                        "prob", "label_index", "label"
-                    ]
-            if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
-                header.append("ground_truth")
-            writer.writerow(header)
-            for item in exists_res:
-                writer.writerow(item)
+        input_file_suffix = os.path.basename(run_args.input_file).split(".")[-1]
+        if input_file_suffix in ["csv", "tsv"]:
+            exists_ids = set()
             exists_res = []
-            batch_data = []
-            batch_ground_truth = []
-            had_done = 0
-
-            reader = file_reader(run_args.input_file) if run_args.input_file.endswith(".csv") or run_args.input_file.endswith(".tsv") \
-                else fasta_reader(run_args.input_file)
-            for row in reader:
+            if os.path.exists(run_args.save_path):
+                print("save_path=%s exists." % run_args.save_path)
                 if run_args.input_mode == "triple":
-                    if row[0] + "_" + row[1] + "_" + row[2] in exists_ids:
-                        continue
-                    # seq_id_a, seq_id_b, seq_id_c, seq_type_a, seq_type_b, seq_type_c, seq_a, seq_b, seq_c
-                    if not seq_type_is_match_seq(row[3], row[6]):
-                        print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
-                            row[0], row[3], row[6]
-                        ))
-                        sys.exit(-1)
-                    if not seq_type_is_match_seq(row[4], row[7]):
-                        print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
-                            row[1], row[4], row[7]
-                        ))
-                        sys.exit(-1)
-                    if not seq_type_is_match_seq(row[5], row[8]):
-                        print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
-                            row[2], row[5], row[8]
-                        ))
-                        sys.exit(-1)
-                    batch_data.append([row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]])
-                    if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
-                        batch_ground_truth.append(row[run_args.ground_truth_idx])
+                    for row in csv_reader(run_args.save_path, header=True, header_filter=True):
+                        if len(row) < 8:
+                            continue
+                        exists_ids.add(row[0] + "_" + row[1] + "_" + row[2])
+                        exists_res.append(row)
+                    print("exists records: %d" % len(exists_res))
                 elif run_args.input_mode == "pair":
-                    if row[0] + "_" + row[1] in exists_ids:
-                        continue
-                    # seq_id_a, seq_id_b, seq_type_a, seq_type_b, seq_a, seq_b
-                    if not seq_type_is_match_seq(row[2], row[4]):
-                        print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
-                            row[0], row[2], row[4]
-                        ))
-                        sys.exit(-1)
-                    if not seq_type_is_match_seq(row[3], row[5]):
-                        print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
-                            row[1], row[3], row[5]
-                        ))
-                        sys.exit(-1)
-                    batch_data.append([row[0], row[1], row[2], row[3], row[4], row[5]])
-                    if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
-                        batch_ground_truth.append(row[run_args.ground_truth_idx])
+                    for row in csv_reader(run_args.save_path, header=True, header_filter=True):
+                        if len(row) < 6:
+                            continue
+                        exists_ids.add(row[0] + "_" + row[1])
+                        exists_res.append(row)
+                    print("exists records: %d" % len(exists_res))
                 else:
-                    if row[0] in exists_ids:
-                        continue
-                    if len(row) == 2:
-                        if not seq_type_is_match_seq(run_args.seq_type, row[1]):
-                            print("Error! the input seq(seq_id=%s) not match its seq_type=%s: %s" % (
-                                row[0], run_args.seq_type, row[1]
+                    for row in csv_reader(run_args.save_path, header=True, header_filter=True):
+                        if len(row) < 4:
+                            continue
+                        exists_ids.add(row[0])
+                        exists_res.append(row)
+                    print("exists records: %d" % len(exists_res))
+            elif not os.path.exists(os.path.dirname(run_args.save_path)):
+                os.makedirs(os.path.dirname(run_args.save_path))
+            with open(run_args.save_path, "w") as wfp:
+                writer = csv.writer(wfp)
+                if run_args.input_mode == "triple":
+                    if run_args.task_type == "multi_class" and run_args.topk is not None and run_args.topk > 1 and run_args.task_level_type == "seq_level":
+                        header = [
+                            "seq_id_a", "seq_id_b", "seq_id_c",
+                            "seq_a", "seq_b", "seq_c",
+                            "top1_prob", "top1_label_index", "top1_label",
+                            "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
+                        ]
+                    else:
+                        header = [
+                            "seq_id_a", "seq_id_b", "seq_id_c",
+                            "seq_a", "seq_b", "seq_c",
+                            "prob", "label_index", "label"
+                        ]
+                elif run_args.input_mode == "pair":
+                    if run_args.task_type == "multi_class" and run_args.topk is not None and run_args.topk > 1 and run_args.task_level_type == "seq_level":
+                        header = [
+                            "seq_id_a", "seq_id_b",
+                            "seq_a", "seq_b",
+                            "top1_prob", "top1_label_index", "top1_label",
+                            "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
+                        ]
+                    else:
+                        header = [
+                            "seq_id_a", "seq_id_b",
+                            "seq_a", "seq_b",
+                            "prob", "label_index", "label"
+                        ]
+                else:
+                    if run_args.task_type == "multi_class" \
+                            and run_args.topk is not None \
+                            and run_args.topk > 1 \
+                            and run_args.task_level_type == "seq_level":
+                        header = [
+                            "seq_id", "seq",
+                            "top1_prob", "top1_label_index", "top1_label",
+                            "top%d_probs" % run_args.topk, "top%d_label_indices" % run_args.topk, "top%d_labels" % run_args.topk
+                        ]
+                    else:
+                        header = [
+                            "seq_id", "seq",
+                            "prob", "label_index", "label"
+                        ]
+                if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
+                    header.append("ground_truth")
+                writer.writerow(header)
+                for item in exists_res:
+                    writer.writerow(item)
+                exists_res = []
+                batch_data = []
+                batch_ground_truth = []
+                had_done = 0
+
+                reader = file_reader(run_args.input_file) if run_args.input_file.endswith(".csv") or run_args.input_file.endswith(".tsv") \
+                    else fasta_reader(run_args.input_file)
+                for row in reader:
+                    if run_args.input_mode == "triple":
+                        if row[0] + "_" + row[1] + "_" + row[2] in exists_ids:
+                            continue
+                        # seq_id_a, seq_id_b, seq_id_c, seq_type_a, seq_type_b, seq_type_c, seq_a, seq_b, seq_c
+                        if not seq_type_is_match_seq(row[3], row[6]):
+                            print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
+                                row[0], row[3], row[6]
                             ))
                             sys.exit(-1)
-                        batch_data.append([row[0], run_args.seq_type, row[1]])
-                    elif len(row) > 2:
-                        if not seq_type_is_match_seq(row[1], row[2]):
-                            print("Error! the input seq(seq_id=%s) not match its seq_type=%s: %s" % (
-                                row[0], row[1], row[2]
+                        if not seq_type_is_match_seq(row[4], row[7]):
+                            print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
+                                row[1], row[4], row[7]
                             ))
                             sys.exit(-1)
+                        if not seq_type_is_match_seq(row[5], row[8]):
+                            print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
+                                row[2], row[5], row[8]
+                            ))
+                            sys.exit(-1)
+                        batch_data.append([row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]])
                         if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
                             batch_ground_truth.append(row[run_args.ground_truth_idx])
-                        # seq_id, seq_type, seq
-                        batch_data.append([row[0], row[1], row[2]])
+                    elif run_args.input_mode == "pair":
+                        if row[0] + "_" + row[1] in exists_ids:
+                            continue
+                        # seq_id_a, seq_id_b, seq_type_a, seq_type_b, seq_a, seq_b
+                        if not seq_type_is_match_seq(row[2], row[4]):
+                            print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
+                                row[0], row[2], row[4]
+                            ))
+                            sys.exit(-1)
+                        if not seq_type_is_match_seq(row[3], row[5]):
+                            print("Error! the input seq_a(seq_id_a=%s) not match its seq_type_a=%s: %s" % (
+                                row[1], row[3], row[5]
+                            ))
+                            sys.exit(-1)
+                        batch_data.append([row[0], row[1], row[2], row[3], row[4], row[5]])
+                        if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
+                            batch_ground_truth.append(row[run_args.ground_truth_idx])
                     else:
-                        continue
-                if len(batch_data) % run_args.print_per_num == 0:
+                        if row[0] in exists_ids:
+                            continue
+                        if len(row) == 2:
+                            if not seq_type_is_match_seq(run_args.seq_type, row[1]):
+                                print("Error! the input seq(seq_id=%s) not match its seq_type=%s: %s" % (
+                                    row[0], run_args.seq_type, row[1]
+                                ))
+                                sys.exit(-1)
+                            batch_data.append([row[0], run_args.seq_type, row[1]])
+                        elif len(row) > 2:
+                            if not seq_type_is_match_seq(row[1], row[2]):
+                                print("Error! the input seq(seq_id=%s) not match its seq_type=%s: %s" % (
+                                    row[0], row[1], row[2]
+                                ))
+                                sys.exit(-1)
+                            if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
+                                batch_ground_truth.append(row[run_args.ground_truth_idx])
+                            # seq_id, seq_type, seq
+                            batch_data.append([row[0], row[1], row[2]])
+                        else:
+                            continue
+                    if len(batch_data) % run_args.print_per_num == 0:
+                        batch_results = run(
+                            batch_data,
+                            run_args.llm_truncation_seq_length,
+                            run_args.model_path,
+                            run_args.dataset_name,
+                            run_args.dataset_type,
+                            run_args.task_type,
+                            run_args.task_level_type,
+                            run_args.model_type,
+                            run_args.input_type,
+                            run_args.time_str,
+                            run_args.step,
+                            run_args.gpu_id,
+                            run_args.threshold,
+                            topk=run_args.topk,
+                            emb_dir=run_args.emb_dir,
+                            matrix_embedding_exists=run_args.matrix_embedding_exists
+                        )
+                        for item_idx, item in enumerate(batch_results):
+                            if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
+                                item.append(batch_ground_truth[item_idx])
+                            writer.writerow(item)
+                        wfp.flush()
+                        had_done += len(batch_data)
+                        print("done %d, had_done: %d" % (len(batch_data), had_done))
+                        batch_data = []
+                        batch_ground_truth = []
+                if len(batch_data) > 0:
                     batch_results = run(
                         batch_data,
                         run_args.llm_truncation_seq_length,
@@ -1501,43 +1525,48 @@ if __name__ == "__main__":
                         emb_dir=run_args.emb_dir,
                         matrix_embedding_exists=run_args.matrix_embedding_exists
                     )
+                    had_done += len(batch_data)
                     for item_idx, item in enumerate(batch_results):
                         if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
                             item.append(batch_ground_truth[item_idx])
                         writer.writerow(item)
                     wfp.flush()
-                    had_done += len(batch_data)
-                    print("done %d, had_done: %d" % (len(batch_data), had_done))
                     batch_data = []
                     batch_ground_truth = []
-            if len(batch_data) > 0:
-                batch_results = run(
-                    batch_data,
-                    run_args.llm_truncation_seq_length,
-                    run_args.model_path,
-                    run_args.dataset_name,
-                    run_args.dataset_type,
-                    run_args.task_type,
-                    run_args.task_level_type,
-                    run_args.model_type,
-                    run_args.input_type,
-                    run_args.time_str,
-                    run_args.step,
-                    run_args.gpu_id,
-                    run_args.threshold,
-                    topk=run_args.topk,
-                    emb_dir=run_args.emb_dir,
-                    matrix_embedding_exists=run_args.matrix_embedding_exists
-                )
-                had_done += len(batch_data)
-                for item_idx, item in enumerate(batch_results):
-                    if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
-                        item.append(batch_ground_truth[item_idx])
-                    writer.writerow(item)
-                wfp.flush()
-                batch_data = []
-                batch_ground_truth = []
-            print("over, had_done: %d" % had_done)
+                print("over, had_done: %d" % had_done)
+        else:
+            if run_args.seq_type is None:
+                print("Please set arg: --seq_type, value: gene or prot")
+                sys.exit(-1)
+            if not seq_type_is_match_seq(run_args.seq_type, run_args.seq):
+                print("Error! the input seq(seq_id=%s) not match its seq_type=%s: %s" % (
+                    run_args.seq_id, run_args.seq_type, run_args.seq
+                ))
+                sys.exit(-1)
+            data = [[run_args.seq_id, run_args.seq_type, run_args.seq]]
+            results = run(
+                data,
+                run_args.llm_truncation_seq_length,
+                run_args.model_path,
+                run_args.dataset_name,
+                run_args.dataset_type,
+                run_args.task_type,
+                run_args.task_level_type,
+                run_args.model_type,
+                run_args.input_type,
+                run_args.time_str,
+                run_args.step,
+                run_args.gpu_id,
+                run_args.threshold,
+                topk=run_args.topk,
+                emb_dir=run_args.emb_dir,
+                matrix_embedding_exists=run_args.matrix_embedding_exists
+            )
+            print("Predicted Result:")
+            print("seq_id=%s" % run_args.seq_id)
+            print("seq=%s" % run_args.seq)
+            print("prob=%f" % results[0][2])
+            print("label=%s" % results[0][3])
     elif run_args.seq_id is not None \
             and run_args.seq is not None:
         if run_args.seq_type is None:

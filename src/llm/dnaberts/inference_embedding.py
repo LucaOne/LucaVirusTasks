@@ -176,13 +176,13 @@ def get_args():
 
 def main(model_args):
     print(model_args)
-    if model_args.gpu_id >= 0:
-        gpu_id = model_args.gpu_id
+    if model_args.gpu_id >= 0 and torch.cuda.is_available():
+        model_args.device = torch.device("cuda:%d" % model_args.gpu_id)
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        model_args.device = torch.device("mps")
     else:
-        # gpu_id = available_gpu_id()
-        gpu_id = -1
-        print("gpu_id: ", gpu_id)
-    model_args.device = torch.device("cuda:%d" % gpu_id if gpu_id > -1 else "cpu")
+        model_args.device = torch.device("cpu")
+
     assert (model_args.input_file is not None and os.path.exists(model_args.input_file)) or model_args.seq is not None
     print("input seq type: %s" % model_args.seq_type)
     print("args device: %s" % model_args.device)

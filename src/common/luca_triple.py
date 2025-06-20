@@ -209,22 +209,22 @@ class LucaGroupedQueryAttention(nn.Module):
             init_method=lambda x: x,
             )
 
-        self.cache_k = torch.zeros(
+        self.register_buffer("cache_k", torch.zeros(
             (
                 max_batch_size,
                 max_seq_len,
                 self.n_local_kv_heads,
                 self.head_dim,
             )
-        ).cuda()
-        self.cache_v = torch.zeros(
+        ))
+        self.register_buffer("cache_v", torch.zeros(
             (
                 max_batch_size,
                 max_seq_len,
                 self.n_local_kv_heads,
                 self.head_dim,
             )
-        ).cuda()
+        ))
 
     def forward(
             self,

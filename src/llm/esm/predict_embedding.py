@@ -518,20 +518,14 @@ def get_args():
 
 
 def main(args):
-    if args.gpu_id >= 0:
-        gpu_id = args.gpu_id
+    print(args)
+    if args.gpu_id >= 0 and torch.cuda.is_available():
+        args.device = torch.device("cuda:%d" % args.gpu_id)
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        args.device = torch.device("mps")
     else:
-        # gpu_id = available_gpu_id()
-        gpu_id = -1
-        print("gpu_id: ", gpu_id)
-    """
-    if gpu_id is None or gpu_id == -1:
-        args.device = None
-    else:
-        args.device = torch.device("cuda:%d" % gpu_id if gpu_id > -1 else "cpu")
-    """
-    args.device = torch.device("cuda:%d" % gpu_id if gpu_id > -1 else "cpu")
-    # esm_global_model.to(args.device)
+        args.device = torch.device("cpu")
+
     assert (args.input_file is not None and os.path.exists(args.input_file)) or args.seq is not None
     print("input seq type: %s" % args.seq_type)
     print("args device: %s" % args.device)

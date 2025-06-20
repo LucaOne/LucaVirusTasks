@@ -350,10 +350,15 @@ class Encoder(object):
         else:
             self.matrix_embedding_exists = False
 
-        if local_rank == -1 and not use_cpu and torch.cuda.is_available():
-            device = torch.device("cuda")
-        elif torch.cuda.is_available() and local_rank > -1:
-            device = torch.device("cuda", local_rank)
+        if use_cpu:
+            device = torch.device("cpu")
+        elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            device = torch.device("mps")
+        elif torch.cuda.is_available():
+            if local_rank > -1:
+                device = torch.device("cuda", local_rank)
+            else:
+                device = torch.device("cuda")
         else:
             device = torch.device("cpu")
         print("Encoder device: ", device)
@@ -1156,8 +1161,8 @@ class Encoder(object):
                                         self.embedding_complete,
                                         self.embedding_complete_seg_overlap,
                                         self.device,
-                                        predict_embedding_func=predict_embedding_luca,
                                         use_cpu=use_cpu,
+                                        predict_embedding_func=predict_embedding_luca,
                                         fp16=self.fp16_embedding
                                     )
                             else:
@@ -1186,6 +1191,7 @@ class Encoder(object):
                                         fp16=self.fp16_embedding
                                     )
                                     use_cpu = True
+
                                 if cur_embedding_info is not None and hasattr(self, "embedding_complete") \
                                         and self.embedding_complete and cur_seq_len > truncation_seq_length:
                                     cur_embedding_info = complete_embedding_matrix(
@@ -1201,8 +1207,8 @@ class Encoder(object):
                                         self.embedding_complete,
                                         self.embedding_complete_seg_overlap,
                                         self.device,
-                                        predict_embedding_func=predict_embedding_luca,
                                         use_cpu=use_cpu,
+                                        predict_embedding_func=predict_embedding_luca,
                                         fp16=self.fp16_embedding
                                     )
                             if use_cpu:

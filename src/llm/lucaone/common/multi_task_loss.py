@@ -74,24 +74,18 @@ def grad_norm(model, task_loss_list, initial_task_loss, alpha=0.12):
     # print('G_w(t): {}'.format(norms))
     # compute the inverse training rate r_i(t)
     # \curl{L}_i
-    if torch.cuda.is_available():
-        loss_ratio = task_loss_list.data.cpu().numpy() / initial_task_loss
-    else:
-        loss_ratio = task_loss_list.data.numpy() / initial_task_loss
+    loss_ratio = task_loss_list.data.cpu().numpy() / initial_task_loss
+
     # r_i(t)
     inverse_train_rate = loss_ratio / np.mean(loss_ratio)
     # print('r_i(t): {}'.format(inverse_train_rate))
     # compute the mean norm \tilde{G}_w(t)
-    if torch.cuda.is_available():
-        mean_norm = np.mean(norms.data.cpu().numpy())
-    else:
-        mean_norm = np.mean(norms.data.numpy())
+    mean_norm = np.mean(norms.data.cpu().numpy())
     # print('tilde G_w(t): {}'.format(mean_norm))
     # compute the GradNorm loss
     # this term has to remain constant
     constant_term = torch.tensor(mean_norm * (inverse_train_rate ** alpha), requires_grad=False)
-    if torch.cuda.is_available():
-        constant_term = constant_term.cuda()
+    constant_term = constant_term.to(norms.device)
     # print('Constant term: {}'.format(constant_term))
     # this is the GradNorm loss itself
     grad_norm_loss = torch.sum(torch.abs(norms - constant_term))

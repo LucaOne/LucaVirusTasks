@@ -265,11 +265,8 @@ def get_args():
                         help="Save checkpoint every X updates steps.")
     parser.add_argument("--eval_all_checkpoints", action="store_true",
                         help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number")
-    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
-    parser.add_argument("--overwrite_output_dir", action="store_true",
-                        help="Overwrite the content of the output directory")
-    parser.add_argument("--overwrite_cache", action="store_true",
-                        help="Overwrite the cached training and evaluation sets")
+    parser.add_argument("--no_gpu", action="store_true",
+                        help="Avoid using GPU when available")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for initialization")
 
@@ -920,10 +917,13 @@ def create_device(args):
     :param args:
     :return:
     '''
-    if args.no_cuda or not torch.cuda.is_available():
+    if args.no_gpu:
         device = torch.device("cpu")
         args.n_gpu = 0
-    else:
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+        args.n_gpu = 1
+    elif torch.cuda.is_available():
         args.n_gpu = torch.cuda.device_count()
         if args.n_gpu > 1:
             torch.cuda.set_device(args.local_rank)
@@ -933,6 +933,9 @@ def create_device(args):
                 print('world size: %d' % dist.get_world_size())
         else:
             device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+        args.n_gpu = 0
     print("create_device:", device)
     return device
 

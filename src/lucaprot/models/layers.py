@@ -118,7 +118,7 @@ class SpGraphAttentionLayer(nn.Module):
         :param adj: (batch_size, N, N)
         :return:
         '''
-        dv = 'cuda' if h.is_cuda else 'cpu'
+        dv = h.device
         batch_size = h.size()[0]
         input_list = torch.split(h, 1, dim=0)
         result_list = [None] * batch_size

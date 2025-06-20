@@ -393,14 +393,15 @@ def predict_embedding(
         else:
             processed_seq = processed_seq[:truncation_seq_length]
 
-    if device is None and not torch.cuda.is_available():
-        device = torch.device("cpu")
-        print("llm use cpu")
-    elif device is None and torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        pass
-        # print("device:", device)
+    if device is None:
+        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            device = torch.device("mps")
+        elif torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+            print("llm use cpu")
+
     if isinstance(llm_dirpath, str):
         emb, processed_seq_len = get_embedding(
             lucavirus_global_args_info,
@@ -828,13 +829,12 @@ def main(model_args):
         )
     if model_args.fp16:
         lucavirus_global_model.half()
-    if model_args.gpu_id >= 0:
-        gpu_id = model_args.gpu_id
+    if model_args.gpu_id >= 0 and torch.cuda.is_available():
+        model_args.device = torch.device("cuda:%d" % model_args.gpu_id)
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        model_args.device = torch.device("mps")
     else:
-        gpu_id = -1
-        print("gpu_id: ", gpu_id)
-    model_args.device = torch.device("cuda:%d" % gpu_id if gpu_id > -1 else "cpu")
-    # lucavirus_global_model.to(model_args.device)
+        model_args.device = torch.device("cpu")
 
     assert (model_args.input_file is not None and os.path.exists(model_args.input_file)) or model_args.seq is not None
     print("input seq type: %s" % model_args.seq_type)
