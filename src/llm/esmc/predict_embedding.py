@@ -373,7 +373,7 @@ def predict_embedding(
             logits_output = esmc_global_model.logits(
                 protein_tensor, LogitsConfig(return_embeddings=True)
             )
-            truncate_len = min(truncation_seq_length, len(protein_seq)-2)
+            truncate_len = min(truncation_seq_length, len(protein_seq))
             if "representations" in embedding_type or "matrix" in embedding_type:
                 if matrix_add_special_token:
                     embedding = logits_output.embeddings.to(device="cpu")[0, 0: truncate_len + 2, :].clone().numpy()
