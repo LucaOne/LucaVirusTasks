@@ -1,0 +1,5 @@
+bash lucavirus/run_prot_fasta_input_test.sh
+bash lucavirus/run_prot_csv_input_test.sh
+bash lucavirus/run_gene_trunc_test.sh
+bash lucavirus/run_gene_segment_test.sh
+bash lucavirus/run_gene_fp16_test.sh
