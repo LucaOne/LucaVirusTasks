@@ -191,7 +191,7 @@ python predict_embedding.py \
    --trunc_type right \
    --seq_type prot \
    --input_file ../../../dataset/DMS_EVA/protein/regression/all_proteins.fasta \
-   --save_path  ../../../../matrices/DeepAbBindv2_original/esm/esm2/3B \
+   --save_path  ../../../../matrices/DeepDMS_EVAAbBindv2_original/esm/esm2/3B \
    --embedding_type matrix \
    --matrix_add_special_token \
    --embedding_complete \
