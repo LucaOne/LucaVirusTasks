@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 class LucaPairIntraInter(BertPreTrainedModel):
     def __init__(self, config, args):
         super(LucaPairIntraInter, self).__init__(config)
+        config.has_intra = True
+        config.has_inter = True
         self.input_type = args.input_type
         self.num_labels = config.num_labels
         self.output_mode = args.output_mode

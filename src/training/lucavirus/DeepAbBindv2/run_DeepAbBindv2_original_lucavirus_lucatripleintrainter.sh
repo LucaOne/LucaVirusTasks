@@ -86,7 +86,7 @@ cd ../../../
 python run.py \
   --train_data_dir ../dataset/$DATASET_NAME/$DATASET_TYPE/$TASK_TYPE/train/ \
   --dev_data_dir ../dataset/$DATASET_NAME/$DATASET_TYPE/$TASK_TYPE/dev/ \
-  --test_data_dir ../dataset/$DATASET_NAME/$DATASET_TYPE/$TASK_TYPE/test/#../dataset/$DATASET_NAME/$DATASET_TYPE/$TASK_TYPE/test2/ \
+  --test_data_dir ../dataset/$DATASET_NAME/$DATASET_TYPE/$TASK_TYPE/test/ \
   --dataset_name $DATASET_NAME \
   --dataset_type $DATASET_TYPE \
   --task_type $TASK_TYPE \

@@ -43,9 +43,13 @@ try:
     from lucapair.models.LucaPairEncoderAB import LucaPairEncoderAB
     from lucapair.models.LucaPairEncoderDual import LucaPairEncoderDual
     from lucapair.models.LucaPairIntraInter import LucaPairIntraInter
+    from lucapair.models.LucaPairIntra import LucaPairIntra
+    from lucapair.models.LucaPairInter import LucaPairInter
     from lucatriple.models.LucaTripleHomo import LucaTripleHomo
     from lucatriple.models.LucaTripleHeter import LucaTripleHeter
     from lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
+    from lucatriple.models.LucaTripleIntra import LucaTripleIntra
+    from lucatriple.models.LucaTripleInter import LucaTripleInter
     from common.alphabet import Alphabet
     from common.model_config import LucaConfig
     from encoder import Encoder
@@ -66,9 +70,13 @@ except ImportError:
     from src.lucapair.models.LucaPairEncoderAB import LucaPairEncoderAB
     from src.lucapair.models.LucaPairEncoderDual import LucaPairEncoderDual
     from src.lucapair.models.LucaPairIntraInter import LucaPairIntraInter
+    from src.lucapair.models.LucaPairIntra import LucaPairIntra
+    from src.lucapair.models.LucaPairInter import LucaPairInter
     from src.lucatriple.models.LucaTripleHomo import LucaTripleHomo
     from src.lucatriple.models.LucaTripleHeter import LucaTripleHeter
     from src.lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
+    from src.lucatriple.models.LucaTripleIntra import LucaTripleIntra
+    from src.lucatriple.models.LucaTripleInter import LucaTripleInter
     from src.common.alphabet import Alphabet
     from src.common.model_config import LucaConfig
     from src.encoder import Encoder
@@ -135,9 +143,13 @@ def get_args():
         "lucapair_encoder_dual",
         "lucapair_decoder_ab",
         "lucapair_decoder_dual",
+        "lucapair_intra",
+        "lucapair_inter",
         "lucapair_intrainter",
         "lucatriple_homo",
         "lucatriple_heter",
+        "lucatriple_intra",
+        "lucatriple_inter",
         "lucatriple_intrainter",
     ], help="the model type of selected")
     parser.add_argument("--input_type", default=None, type=str, required=True,  choices=[
@@ -875,12 +887,20 @@ def get_model(args):
         model_class = LucaPairEncoderAB
     elif args.model_type in ["lucapair_encoder_dual"]:
         model_class = LucaPairEncoderDual
+    elif args.model_type in ["lucapair_intra"]:
+        model_class = LucaPairIntra
+    elif args.model_type in ["lucapair_inter"]:
+        model_class = LucaPairInter
     elif args.model_type in ["lucapair_intrainter"]:
         model_class = LucaPairIntraInter
     elif args.model_type in ["lucatriple_homo"]:
         model_class = LucaTripleHomo
     elif args.model_type in ["lucatriple_heter"]:
         model_class = LucaTripleHeter
+    elif args.model_type in ["lucatriple_intra"]:
+        model_class = LucaTripleIntra
+    elif args.model_type in ["lucatriple_inter"]:
+        model_class = LucaTripleInter
     elif args.model_type in ["lucatriple_intrainter"]:
         model_class = LucaTripleIntraInter
     elif args.model_type == "lucabase":
@@ -910,6 +930,28 @@ def get_model(args):
         model_config.dropout = 0.0
         model_config.classifier_dropout = args.dropout_prob
         args.matrix_add_special_token = True
+    elif args.model_type in ["lucapair_intra"]:
+        model_config.self_encoder_layers = args.num_hidden_layers
+        model_config.self_attention_heads = args.num_attention_heads
+        if not hasattr(model_config, "encoder_ffn_dim") or model_config.encoder_ffn_dim is None or model_config.encoder_ffn_dim <= 0:
+            model_config.encoder_ffn_dim = args.intermediate_size
+        model_config.embedding_input_size_a = args.embedding_input_size_a if args.embedding_input_size_a else args.embedding_input_size
+        model_config.embedding_input_size_b = args.embedding_input_size_b if args.embedding_input_size_b else args.embedding_input_size
+        model_config.hidden_size = args.hidden_size if args.hidden_size else (model_config.embedding_input_size_a if model_config.embedding_input_size_a == model_config.embedding_input_size_b else 1024)
+        model_config.dropout = 0.0
+        model_config.classifier_dropout = args.dropout_prob
+        args.matrix_add_special_token = True
+    elif args.model_type in ["lucapair_inter"]:
+        model_config.cross_encoder_layers = args.num_hidden_layers
+        model_config.cross_attention_heads = args.num_attention_heads
+        if not hasattr(model_config, "encoder_ffn_dim") or model_config.encoder_ffn_dim is None or model_config.encoder_ffn_dim <= 0:
+            model_config.encoder_ffn_dim = args.intermediate_size
+        model_config.embedding_input_size_a = args.embedding_input_size_a if args.embedding_input_size_a else args.embedding_input_size
+        model_config.embedding_input_size_b = args.embedding_input_size_b if args.embedding_input_size_b else args.embedding_input_size
+        model_config.hidden_size = args.hidden_size if args.hidden_size else (model_config.embedding_input_size_a if model_config.embedding_input_size_a == model_config.embedding_input_size_b else 1024)
+        model_config.dropout = 0.0
+        model_config.classifier_dropout = args.dropout_prob
+        args.matrix_add_special_token = True
     elif args.model_type in ["lucapair_intrainter"]:
         model_config.self_encoder_layers = args.num_hidden_layers
         model_config.self_attention_heads = args.num_attention_heads
@@ -920,6 +962,30 @@ def get_model(args):
         model_config.embedding_input_size_a = args.embedding_input_size_a if args.embedding_input_size_a else args.embedding_input_size
         model_config.embedding_input_size_b = args.embedding_input_size_b if args.embedding_input_size_b else args.embedding_input_size
         model_config.hidden_size = args.hidden_size if args.hidden_size else (model_config.embedding_input_size_a if model_config.embedding_input_size_a == model_config.embedding_input_size_b else 1024)
+        model_config.dropout = 0.0
+        model_config.classifier_dropout = args.dropout_prob
+        args.matrix_add_special_token = True
+    elif args.model_type in ["lucatriple_intra"]:
+        model_config.self_encoder_layers = args.num_hidden_layers
+        model_config.self_attention_heads = args.num_attention_heads
+        if not hasattr(model_config, "encoder_ffn_dim") or model_config.encoder_ffn_dim is None or model_config.encoder_ffn_dim <= 0:
+            model_config.encoder_ffn_dim = args.intermediate_size
+        model_config.embedding_input_size_a = args.embedding_input_size_a if args.embedding_input_size_a else args.embedding_input_size
+        model_config.embedding_input_size_b = args.embedding_input_size_b if args.embedding_input_size_b else args.embedding_input_size
+        model_config.embedding_input_size_c = args.embedding_input_size_c if args.embedding_input_size_c else args.embedding_input_size
+        model_config.hidden_size = args.hidden_size if args.hidden_size else (model_config.embedding_input_size_a if model_config.embedding_input_size_a == model_config.embedding_input_size_b == model_config.embedding_input_size_c else 1024)
+        model_config.dropout = 0.0
+        model_config.classifier_dropout = args.dropout_prob
+        args.matrix_add_special_token = True
+    elif args.model_type in ["lucatriple_inter"]:
+        model_config.cross_encoder_layers = args.num_hidden_layers
+        model_config.cross_attention_heads = args.num_attention_heads
+        if not hasattr(model_config, "encoder_ffn_dim") or model_config.encoder_ffn_dim is None or model_config.encoder_ffn_dim <= 0:
+            model_config.encoder_ffn_dim = args.intermediate_size
+        model_config.embedding_input_size_a = args.embedding_input_size_a if args.embedding_input_size_a else args.embedding_input_size
+        model_config.embedding_input_size_b = args.embedding_input_size_b if args.embedding_input_size_b else args.embedding_input_size
+        model_config.embedding_input_size_c = args.embedding_input_size_c if args.embedding_input_size_c else args.embedding_input_size
+        model_config.hidden_size = args.hidden_size if args.hidden_size else (model_config.embedding_input_size_a if model_config.embedding_input_size_a == model_config.embedding_input_size_b == model_config.embedding_input_size_c else 1024)
         model_config.dropout = 0.0
         model_config.classifier_dropout = args.dropout_prob
         args.matrix_add_special_token = True

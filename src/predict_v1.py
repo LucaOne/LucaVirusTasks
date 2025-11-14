@@ -41,8 +41,13 @@ try:
     from lucapair.models.LucaPairEncoderAB import LucaPairEncoderAB
     from lucapair.models.LucaPairEncoderDual import LucaPairEncoderDual
     from lucapair.models.LucaPairIntraInter import LucaPairIntraInter
+    from lucapair.models.LucaPairIntra import LucaPairIntra
+    from lucapair.models.LucaPairInter import LucaPairInter
     from lucatriple.models.LucaTripleHomo import LucaTripleHomo
     from lucatriple.models.LucaTripleHeter import LucaTripleHeter
+    from lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
+    from lucatriple.models.LucaTripleIntra import LucaTripleIntra
+    from lucatriple.models.LucaTripleInter import LucaTripleInter
 except ImportError:
     from src.utils import to_device, device_memory, available_gpu_id, load_labels, seq_type_is_match_seq, \
         download_trained_checkpoint_lucaone, download_trained_checkpoint_lucavirus, \
@@ -60,8 +65,13 @@ except ImportError:
     from src.lucapair.models.LucaPairEncoderAB import LucaPairEncoderAB
     from src.lucapair.models.LucaPairEncoderDual import LucaPairEncoderDual
     from src.lucapair.models.LucaPairIntraInter import LucaPairIntraInter
+    from src.lucapair.models.LucaPairIntra import LucaPairIntra
+    from src.lucapair.models.LucaPairInter import LucaPairInter
     from src.lucatriple.models.LucaTripleHomo import LucaTripleHomo
     from src.lucatriple.models.LucaTripleHeter import LucaTripleHeter
+    from src.lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
+    from src.lucatriple.models.LucaTripleIntra import LucaTripleIntra
+    from src.lucatriple.models.LucaTripleInter import LucaTripleInter
 
 
 def transform_one_sample_2_feature(
@@ -871,7 +881,17 @@ def load_model(
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairEncoderAB
     elif args.model_type in ["lucapair_encoder_dual"]:
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairEncoderDual
+    elif args.model_type in ["lucapair_intra"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairIntra
+    elif args.model_type in ["lucapair_inter"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairInter
     elif args.model_type in ["lucapair_intrainter"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairIntraInter
+    elif args.model_type in ["lucatriple_intra"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleIntra
+    elif args.model_type in ["lucatriple_inter"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleInter
+    elif args.model_type in ["lucatriple_intrainter"]:
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairIntraInter
     elif args.model_type in ["lucatriple_homo"]:
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleHomo
@@ -1274,7 +1294,12 @@ def get_args():
                         choices=["seq_level", "token_level"], 
                         help="the task level type for model building.")
     parser.add_argument("--model_type", default=None, type=str, required=True,
-                        choices=["lucabase", "lucapair_homo", "lucapair_heter", "lucatriple_homo", "lucatriple_heter"],
+                        choices=[
+                            "lucabase",
+                            "lucapair_homo", "lucapair_heter",
+                            "lucatriple_homo", "lucatriple_heter",
+                            "lucatriple_intra", "lucatriple_inter", "lucatriple_intrainter"
+                        ],
                         help="the model type.")
     parser.add_argument("--input_type", default=None, type=str, required=True, 
                         choices=["seq", "matrix", "vector", "seq-matrix", "seq-vector"], 
