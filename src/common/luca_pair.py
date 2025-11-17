@@ -1080,7 +1080,7 @@ class LucaPair(PreTrainedModel):
         self.layer_norm_type = config.layer_norm_type
         self.has_intra = config.has_intra if hasattr(config, "has_intra") else config.has_intra
         self.has_inter = config.has_inter if hasattr(config, "has_inter") else config.has_inter
-        assert self.has_intra and self.has_inter
+        assert self.has_intra or self.has_inter
         self.embed_dim = config.embed_dim if hasattr(config, "embed_dim") else config.hidden_size
         self.padding_idx = config.pad_token_id
         self.max_source_positions = config.max_position_embeddings
