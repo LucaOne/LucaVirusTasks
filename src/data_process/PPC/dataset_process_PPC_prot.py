@@ -48,7 +48,8 @@ for f_idx, data_filepath in enumerate(data_filepath_list):
         positive_rate.append(cur_positive_rate)
         if seq_type != "prot":
             print(row)
-            print(1/0)
+            print("Error, the seq_type(%s) != prot" % seq_type)
+            sys.exit(-1)
         assert label_len == seq_len
         assert seq_type == "prot"
 
