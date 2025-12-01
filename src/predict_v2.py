@@ -80,7 +80,7 @@ def transform_one_sample_2_feature(
         device,
         input_mode,
         encoder,
-        batch_convecter,
+        batch_converter,
         row
 ):
     """
@@ -88,12 +88,14 @@ def transform_one_sample_2_feature(
     :param device:
     :param input_mode:
     :param encoder:
-    :param batch_convecter:
+    :param batch_converter:
     :param row:
     :return:
     """
     batch_info = []
+    sample_ids = []
     if input_mode in ["triple"]:
+        sample_ids.append(row[0] + "#" + row[1] + "#" + row[2])
         # seq_id_a, seq_id_b, seq_id_c, seq_type_a, seq_type_b, seq_type_c, seq_a, seq_b, seq_c
         en = encoder.encode_triple(
             row[0],
@@ -118,6 +120,7 @@ def transform_one_sample_2_feature(
         seq_lens = [len(row[6]), len(row[7]), len(row[8])]
     elif input_mode in ["pair"]:
         # seq_id_a, seq_id_b, seq_type_a, seq_type_b, seq_a, seq_b
+        sample_ids.append(row[0] + "#" + row[1])
         en = encoder.encode_pair(
             row[0],
             row[1],
@@ -135,6 +138,7 @@ def transform_one_sample_2_feature(
         batch_info.append([row[0], row[1], row[4], row[5]])
         seq_lens = [len(row[4]), len(row[5])]
     else:
+        sample_ids.append(row[0])
         # seq_id, seq_type, seq
         en = encoder.encode_single(
             row[0],
@@ -151,19 +155,19 @@ def transform_one_sample_2_feature(
     if isinstance(batch[0], list):
         batch_features = []
         for cur_batch in batch[0]:
-            cur_batch_features = batch_convecter([cur_batch])
+            cur_batch_features = batch_converter([cur_batch])
             cur_batch_features, cur_sample_num = to_device(device, cur_batch_features)
             batch_features.append(cur_batch_features)
     else:
-        batch_features = batch_convecter(batch)
+        batch_features = batch_converter(batch)
         batch_features, cur_sample_num = to_device(device, batch_features)
-    return batch_info, batch_features, [seq_lens]
+    return batch_info, batch_features, [seq_lens], sample_ids
 
 
 def predict_probs(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         model,
         row
 ):
@@ -171,29 +175,37 @@ def predict_probs(
     predict the prob
     :param args:
     :param encoder:
-    :param batch_convecter:
+    :param batch_converter:
     :param model:
     :param row:
     :return:
     """
-    batch_info, batch_features, seq_lens = transform_one_sample_2_feature(
+    batch_info, batch_features, seq_lens, sample_ids = transform_one_sample_2_feature(
         args.device,
         args.input_mode,
         encoder,
-        batch_convecter,
+        batch_converter,
         row
     )
     if isinstance(batch_features, list):
         probs = []
         for cur_batch_features in batch_features:
-            cur_probs = model(**cur_batch_features)[1]
+            cur_probs = model(
+                **cur_batch_features,
+                sample_ids=sample_ids,
+                attention_scores_savepath=args.output_attention_scores_dirpath,
+            )[1]
             if cur_probs.is_cuda:
                 cur_probs = cur_probs.detach().cpu().numpy()
             else:
                 cur_probs = cur_probs.detach().numpy()
             probs.append(cur_probs)
     else:
-        probs = model(**batch_features)[1]
+        probs = model(
+            **batch_features,
+            sample_ids=sample_ids,
+            attention_scores_savepath=args.output_attention_scores_dirpath,
+        )[1]
         if probs.is_cuda:
             probs = probs.detach().cpu().numpy()
         else:
@@ -204,7 +216,7 @@ def predict_probs(
 def predict_token_level_binary_class(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
@@ -213,13 +225,13 @@ def predict_token_level_binary_class(
     prediction for the token-level binary classification
     :param args:
     :param encoder:
-    :param batch_convecter:
+    :param batch_converter:
     :param label_id_2_name:
     :param model:
     :param row:
     :return:
     """
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # probs: (batch_size, seq_len, 1)
     # print("probs dim: ", probs.ndim)
     # preds: (batch_size, seq_len, 1)
@@ -271,13 +283,13 @@ def predict_token_level_binary_class(
 def predict_token_level_multi_class(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row,
         topk=5
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # probs: (batch_size, seq_len, label_size)
     # preds: (batch_size, seq_len)
     preds = np.argmax(probs, axis=-1)
@@ -398,12 +410,12 @@ def predict_token_level_multi_class(
 def predict_token_level_multi_label(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # print("probs dim: ", probs.ndim)
     # probs: (batch_size, seq_len, label_size)
     # preds: (batch_size, seq_len, size of the prob > threshold)
@@ -455,12 +467,12 @@ def predict_token_level_multi_label(
 def predict_token_level_regression(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # probs: (batch_size, seq_len, 1)
     probs = probs.tolist()
     res = []
@@ -508,12 +520,12 @@ def predict_token_level_regression(
 def predict_seq_level_binary_class(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # print("probs dim: ", probs.ndim)
     # probs: (batch_size, 1)
     # preds: (batch_size, 1)
@@ -565,13 +577,13 @@ def predict_seq_level_binary_class(
 def predict_seq_level_multi_class(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row,
         topk=5
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # print("probs dim: ", probs.ndim)
     # probs: (batch_size, label_size)
     # preds: (batch_size, )
@@ -686,12 +698,12 @@ def predict_seq_level_multi_class(
 def predict_seq_level_multi_label(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # print("probs dim: ", probs.ndim)
     # probs: (batch_size, label_size)
     # preds: (batch_size, size of the prob > threshold)
@@ -743,12 +755,12 @@ def predict_seq_level_multi_label(
 def predict_seq_level_regression(
         args,
         encoder,
-        batch_convecter,
+        batch_converter,
         label_id_2_name,
         model,
         row
 ):
-    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_convecter, model, row)
+    batch_info, probs, seq_lens = predict_probs(args, encoder, batch_converter, model, row)
     # probs: (batch_size, 1)
     probs = probs.tolist()
     res = []
@@ -914,7 +926,7 @@ def load_model(
     return model_config, seq_subword, seq_tokenizer, model
 
 
-def create_encoder_batch_convecter(
+def create_encoder_batch_converter(
         model_args,
         seq_subword,
         seq_tokenizer
@@ -1008,7 +1020,8 @@ def run(
         threshold,
         topk,
         emb_dir,
-        matrix_embedding_exists
+        matrix_embedding_exists,
+        output_attention_scores_dirpath
 ):
     global global_model_config, global_seq_subword, global_seq_tokenizer, global_trained_model
     model_dir = "%s/models/%s/%s/%s/%s/%s/%s/%s" % (
@@ -1029,6 +1042,7 @@ def run(
     model_args.truncation_matrix_length = model_args.matrix_max_length
 
     model_args.matrix_embedding_exists = matrix_embedding_exists
+    model_args.output_attention_scores_dirpath = output_attention_scores_dirpath
     # embedding saved dir during prediction
     if emb_dir and not matrix_embedding_exists:
         # now = datetime.now()
@@ -1092,7 +1106,7 @@ def run(
 
     print("------After loaded the model:------")
     device_memory(None if gpu_id == -1 else gpu_id)
-    encoder, batch_convecter = create_encoder_batch_convecter(model_args, seq_subword, seq_tokenizer)
+    encoder, batch_converter = create_encoder_batch_converter(model_args, seq_subword, seq_tokenizer)
 
     # V2的不同点：embedding in advance
     # embedding in advance
@@ -1210,7 +1224,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record,
@@ -1232,7 +1246,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record
@@ -1254,7 +1268,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record,
@@ -1276,7 +1290,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record
@@ -1296,7 +1310,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record,
@@ -1317,7 +1331,7 @@ def run(
                 cur_res = predict_func(
                     model_args,
                     encoder,
-                    batch_convecter,
+                    batch_converter,
                     label_id_2_name,
                     trained_model,
                     row=record
@@ -1405,17 +1419,38 @@ def get_args():
     # for results(csv format, contain header)
     parser.add_argument("--save_path", default=None, type=str, help="the result save path")
     # for print info
+    parser.add_argument(
+        "--output_attention_scores_dirpath",
+        default=None,
+        type=str,
+        help="the save path output the attention scores(one file for each one sample)"
+    )
     parser.add_argument("--print_per_num", default=10000, type=int, help="per num to print")
     parser.add_argument("--gpu_id", default=None, type=int, help="the used gpu index, -1 for cpu")
     input_args = parser.parse_args()
     return input_args
 
 
+def print_run_args(run_args):
+    print("-" * 25 + "Run Args" + "-" * 25)
+    args_dict = {}
+    for item in run_args.__dict__.items():
+        if item[1] is not None:
+            if item[0] == "threshold" and run_args.task_type not in ["binary_class", "multi_label"]:
+                continue
+            args_dict[item[0]] = item[1]
+    print(args_dict)
+    print("-" * 50)
+
+
 if __name__ == "__main__":
     run_args = get_args()
-    print("-" * 25 + "Run Args" + "-" * 25)
-    print(run_args.__dict__)
-    print("-" * 50)
+    print_run_args(run_args)
+
+    if run_args.output_attention_scores_dirpath:
+        run_args.output_attention_scores = True
+        if not os.path.exists(run_args.output_attention_scores_dirpath):
+            os.makedirs(run_args.output_attention_scores_dirpath)
 
     if run_args.input_file is not None:
         input_file_suffix = os.path.basename(run_args.input_file).split(".")[-1]
@@ -1606,7 +1641,8 @@ if __name__ == "__main__":
                         run_args.threshold,
                         topk=run_args.topk,
                         emb_dir=run_args.emb_dir,
-                        matrix_embedding_exists=run_args.matrix_embedding_exists
+                        matrix_embedding_exists=run_args.matrix_embedding_exists,
+                        output_attention_scores_dirpath=run_args.output_attention_scores_dirpath,
                     )
                     for item_idx, item in enumerate(batch_results):
                         if run_args.ground_truth_idx is not None and run_args.ground_truth_idx >= 0:
@@ -1635,7 +1671,8 @@ if __name__ == "__main__":
                     run_args.threshold,
                     topk=run_args.topk,
                     emb_dir=run_args.emb_dir,
-                    matrix_embedding_exists=run_args.matrix_embedding_exists
+                    matrix_embedding_exists=run_args.matrix_embedding_exists,
+                    output_attention_scores_dirpath=run_args.output_attention_scores_dirpath,
                 )
                 had_done += len(batch_data)
                 for item_idx, item in enumerate(batch_results):
@@ -1674,7 +1711,8 @@ if __name__ == "__main__":
             run_args.threshold,
             topk=run_args.topk,
             emb_dir=run_args.emb_dir,
-            matrix_embedding_exists=run_args.matrix_embedding_exists
+            matrix_embedding_exists=run_args.matrix_embedding_exists,
+            output_attention_scores_dirpath=run_args.output_attention_scores_dirpath
         )
         print("Predicted Result:")
         print("seq_id=%s" % run_args.seq_id)
@@ -1721,7 +1759,8 @@ if __name__ == "__main__":
             run_args.threshold,
             topk=run_args.topk,
             emb_dir=run_args.emb_dir,
-            matrix_embedding_exists=run_args.matrix_embedding_exists
+            matrix_embedding_exists=run_args.matrix_embedding_exists,
+            output_attention_scores_dirpath=run_args.output_attention_scores_dirpath
         )
         print("Predicted Result:")
         print("seq_id=%s" % run_args.seq_id)
@@ -1780,7 +1819,8 @@ if __name__ == "__main__":
             run_args.threshold,
             topk=run_args.topk,
             emb_dir=run_args.emb_dir,
-            matrix_embedding_exists=run_args.matrix_embedding_exists
+            matrix_embedding_exists=run_args.matrix_embedding_exists,
+            output_attention_scores_dirpath=run_args.output_attention_scores_dirpath
         )
         print("Predicted Result:")
         print("seq_id_a=%s, seq_id_b=%s" % (run_args.seq_id_a, run_args.seq_id_b))

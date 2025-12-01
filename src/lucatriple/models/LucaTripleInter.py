@@ -103,6 +103,11 @@ class LucaTripleInter(BertPreTrainedModel):
             labels=None,
             **kwargs
     ):
+        sample_ids = kwargs["sample_ids"] if "sample_ids" in kwargs else None
+        attention_scores_savepath = kwargs["attention_scores_savepath"] if "attention_scores_savepath" in kwargs else None
+        return_attentions = sample_ids is not None and attention_scores_savepath is not None
+        output_attentions = return_attentions or output_attentions
+
         # 对称结构： intra-attention + inter-attention
         # matrices_a: seq_a_embedding, [B, seq_len_a, dim]
         # matrix_attention_masks_a: seq_a_mask, [B, seq_len_a]
@@ -124,7 +129,7 @@ class LucaTripleInter(BertPreTrainedModel):
         else:
             hidden_states_c = matrices_c
 
-        last_hidden_states = self.encoder(
+        output = self.encoder(
             hidden_states_a=hidden_states_a,
             attention_mask_a=matrix_attention_masks_a,
             hidden_states_b=hidden_states_b,
@@ -146,7 +151,23 @@ class LucaTripleInter(BertPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=False,
             return_dict=True
-        ).last_hidden_state
+        )
+        last_hidden_states = output.last_hidden_state
+        if return_attentions:
+            cross_attentions = output.cross_attentions
+            for sample_idx in range(len(sample_ids)):
+                cur_cross_attention = ()
+                for layer in cross_attentions:
+                    cur_cross_attention = cur_cross_attention + (
+                        layer[0][sample_idx],
+                        layer[1][sample_idx],
+                        layer[2][sample_idx],
+                        layer[3][sample_idx],
+                        layer[4][sample_idx],
+                        layer[5][sample_idx]
+                    )
+                filepath = os.path.join(attention_scores_savepath, "%s_seq_attention_scores.pt" % sample_ids[sample_idx])
+                torch.save(cross_attentions, filepath)
 
         last_hidden_states = [
             # ab
