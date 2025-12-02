@@ -50,11 +50,11 @@ python predict_v2.py \
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 python predict_v2.py \
     --seq_type prot \
-    --input_file ../data/dev_alpha_rbd.csv \
+    --input_file ../data/antibody_attention/dev_wt_rbd.csv \
     --llm_truncation_seq_length 4096 \
     --emb_dir ../../matrices/DeepAbBindv2_original/lucavirus/v1.0/3800000 \
     --model_path .. \
-    --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_alpha_rbd.csv \
+    --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_wt_rbd.csv \
     --dataset_name DeepAbBindv2_original \
     --dataset_type protein_protein_protein \
     --task_type binary_class \
@@ -66,7 +66,7 @@ python predict_v2.py \
     --step 90257 \
     --threshold 0.5 \
     --matrix_embedding_exists \
-    --output_attention_scores_dirpath \
+    --output_attention_scores_dirpath ../predicted/attention_scores/dev_wt_rbd \
     --print_per_num 1000 \
     --gpu_id 1
 

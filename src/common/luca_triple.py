@@ -1248,7 +1248,7 @@ class LucaTriple(PreTrainedModel):
             if self._use_flash_attention_2:
                 cross_attention_mask_ab = attention_mask_b if 0 in attention_mask_b else None
                 cross_attention_mask_ac = attention_mask_c if 0 in attention_mask_c else None
-            elif self._use_sdpa and cross_attn_head_mask_ab is None and not output_attentions:
+            elif self._use_sdpa and cross_attn_head_mask_ab is None and cross_attn_head_mask_ac is None and not output_attentions:
                 # output_attentions=True & cross_attn_head_mask can not be supported when using SDPA, and we fall back on
                 # the manual implementation that requires a 4D causal mask in all cases.
                 # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -1274,7 +1274,7 @@ class LucaTriple(PreTrainedModel):
             if self._use_flash_attention_2:
                 cross_attention_mask_ba = attention_mask_a if 0 in attention_mask_a else None
                 cross_attention_mask_bc = attention_mask_c if 0 in attention_mask_c else None
-            elif self._use_sdpa and cross_attn_head_mask_ba is None and not output_attentions:
+            elif self._use_sdpa and cross_attn_head_mask_ba is None and cross_attn_head_mask_bc is None and not output_attentions:
                 # output_attentions=True & cross_attn_head_mask can not be supported when using SDPA, and we fall back on
                 # the manual implementation that requires a 4D causal mask in all cases.
                 # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -1300,7 +1300,7 @@ class LucaTriple(PreTrainedModel):
             if self._use_flash_attention_2:
                 cross_attention_mask_ca = attention_mask_a if 0 in attention_mask_a else None
                 cross_attention_mask_cb = attention_mask_b if 0 in attention_mask_b else None
-            elif self._use_sdpa and cross_attn_head_mask_ba is None and not output_attentions:
+            elif self._use_sdpa and cross_attn_head_mask_ca is None and cross_attn_head_mask_cb is None and not output_attentions:
                 # output_attentions=True & cross_attn_head_mask can not be supported when using SDPA, and we fall back on
                 # the manual implementation that requires a 4D causal mask in all cases.
                 # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -1328,7 +1328,7 @@ class LucaTriple(PreTrainedModel):
             if self.has_intra:
                 hidden_states_a = self.embed_layer_norm_a(hidden_states_a)
                 hidden_states_b = self.embed_layer_norm_b(hidden_states_b)
-                hidden_states_c = self.embed_layer_norm_b(hidden_states_c)
+                hidden_states_c = self.embed_layer_norm_c(hidden_states_c)
             if self.has_inter:
                 hidden_states_ab = self.embed_layer_norm_a(hidden_states_a)
                 hidden_states_ba = self.embed_layer_norm_b(hidden_states_b)
@@ -1752,14 +1752,14 @@ class LucaTriple(PreTrainedModel):
             if self.has_intra:
                 hidden_states_a = self.last_layer_norm_a(hidden_states_a)
                 hidden_states_b = self.last_layer_norm_b(hidden_states_b)
-                hidden_states_c = self.last_layer_norm_b(hidden_states_c)
+                hidden_states_c = self.last_layer_norm_c(hidden_states_c)
             if self.has_inter:
                 hidden_states_ab = self.last_layer_norm_ab(hidden_states_ab)
                 hidden_states_ba = self.last_layer_norm_ba(hidden_states_ba)
-                hidden_states_ac = self.last_layer_norm_ab(hidden_states_ac)
-                hidden_states_ca = self.last_layer_norm_ba(hidden_states_ca)
-                hidden_states_bc = self.last_layer_norm_ab(hidden_states_bc)
-                hidden_states_cb = self.last_layer_norm_ba(hidden_states_cb)
+                hidden_states_ac = self.last_layer_norm_ac(hidden_states_ac)
+                hidden_states_ca = self.last_layer_norm_ca(hidden_states_ca)
+                hidden_states_bc = self.last_layer_norm_bc(hidden_states_bc)
+                hidden_states_cb = self.last_layer_norm_cb(hidden_states_cb)
 
         if output_hidden_states:
             if self.has_intra:
@@ -1850,3 +1850,555 @@ class LucaTriple(PreTrainedModel):
                 cross_attentions=all_cross_attentions,
             )
 
+class LucaTripleV2(PreTrainedModel):
+    """
+    Encoder
+    """
+    def __init__(self, config: PretrainedConfig):
+        super().__init__(config)
+        self.dropout = config.dropout
+        self.layer_dropout = config.encoder_layer_dropout
+        self.use_rotary_position_embeddings = config.use_rotary_position_embeddings
+        self.layer_norm_type = config.layer_norm_type
+        self.has_intra = config.has_intra if hasattr(config, "has_intra") else True
+        self.has_inter = config.has_inter if hasattr(config, "has_inter") else True
+        assert self.has_intra or self.has_inter
+        self.embed_dim = config.embed_dim if hasattr(config, "embed_dim") else config.hidden_size
+        self.padding_idx = config.pad_token_id
+        self.max_source_positions = config.max_position_embeddings
+
+        if self.layer_norm_type == "pre":
+            self.embed_layer_norm_a = None
+            self.embed_layer_norm_b = None
+            self.embed_layer_norm_c = None
+        else:
+            if config.layer_norm_name == "RMSNorm":
+                self.embed_layer_norm_a = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_b = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_c = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+            elif config.layer_norm_name == "FlashRMSNorm":
+                self.embed_layer_norm_a = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_b = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_c = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+            else:
+                self.embed_layer_norm_a = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_b = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+                self.embed_layer_norm_c = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+        if self.has_intra:
+            self.self_layers_a = nn.ModuleList([LucaTripleLayer(config, cross=False) for _ in range(config.self_encoder_layers)])
+            self.self_layers_b = nn.ModuleList([LucaTripleLayer(config, cross=False) for _ in range(config.self_encoder_layers)])
+            self.self_layers_c = nn.ModuleList([LucaTripleLayer(config, cross=False) for _ in range(config.self_encoder_layers)])
+
+        if self.has_inter:
+            self.cross_layers_ac = nn.ModuleList([LucaTripleLayer(config, cross=True) for _ in range(config.cross_encoder_layers)])
+            self.cross_layers_bc = nn.ModuleList([LucaTripleLayer(config, cross=True) for _ in range(config.cross_encoder_layers)])
+
+        self._use_flash_attention_2 = config.attn_type == "flash_attention_2"
+        self._use_sdpa = config.attn_type == "sdpa"
+        if self.layer_norm_type == "pre":
+            if config.layer_norm_name == "RMSNorm":
+                if self.has_intra:
+                    self.last_layer_norm_a = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_b = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_c = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+
+                if self.has_inter:
+                    self.last_layer_norm_ac = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_bc = LucaRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+            elif config.layer_norm_name == "FlashRMSNorm":
+                if self.has_intra:
+                    self.last_layer_norm_a = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_b = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_c = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+
+                if self.has_inter:
+                    self.last_layer_norm_ac = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_bc = LucaFlashRMSNorm(dim=self.embed_dim, eps=config.layer_norm_eps)
+            else:
+                if self.has_intra:
+                    self.last_layer_norm_a = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_b = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_c = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+
+                if self.has_inter:
+                    self.last_layer_norm_ac = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+                    self.last_layer_norm_bc = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
+        self.gradient_checkpointing = False
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+            self,
+            hidden_states_a: Optional[torch.FloatTensor] = None,
+            attention_mask_a: Optional[torch.LongTensor] = None,
+            hidden_states_b: Optional[torch.FloatTensor] = None,
+            attention_mask_b: Optional[torch.LongTensor] = None,
+            hidden_states_c: Optional[torch.FloatTensor] = None,
+            attention_mask_c: Optional[torch.LongTensor] = None,
+            head_mask_a: Optional[torch.Tensor] = None,
+            cross_attn_head_mask_ac: Optional[torch.Tensor] = None,
+            head_mask_b: Optional[torch.Tensor] = None,
+            cross_attn_head_mask_bc: Optional[torch.Tensor] = None,
+            head_mask_c: Optional[torch.Tensor] = None,
+            past_key_values: Optional[List[torch.FloatTensor]] = None,
+            cross_past_key_values: Optional[List[torch.FloatTensor]] = None,
+            use_cache: Optional[bool] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutput]:
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if hidden_states_a is not None:
+            input_shape_a = hidden_states_a.size()[:-1]
+        else:
+            raise ValueError("You have to specify hidden_states_a")
+
+        if hidden_states_b is not None:
+            input_shape_b = hidden_states_b.size()[:-1]
+        else:
+            raise ValueError("You have to specify hidden_states_b")
+
+        if hidden_states_c is not None:
+            input_shape_c = hidden_states_c.size()[:-1]
+        else:
+            raise ValueError("You have to specify hidden_states_c")
+
+        # expand attention_mask
+        if attention_mask_a is not None:
+            if self._use_flash_attention_2:
+                attention_mask_aa = attention_mask_a if 0 in attention_mask_a else None
+            elif self._use_sdpa and head_mask_a is None and not output_attentions:
+                # output_attentions=True & head_mask can not be supported when using SDPA, fall back to
+                # the manual implementation that requires a 4D causal mask in all cases.
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_aa = _prepare_4d_attention_mask_for_sdpa(attention_mask_a, hidden_states_a.dtype)
+            else:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_aa = _prepare_4d_attention_mask(attention_mask_a, hidden_states_a.dtype)
+
+        if attention_mask_b is not None:
+            if self._use_flash_attention_2:
+                attention_mask_bb = attention_mask_b if 0 in attention_mask_b else None
+            elif self._use_sdpa and head_mask_b is None and not output_attentions:
+                # output_attentions=True & head_mask can not be supported when using SDPA, fall back to
+                # the manual implementation that requires a 4D causal mask in all cases.
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_bb = _prepare_4d_attention_mask_for_sdpa(attention_mask_b, hidden_states_b.dtype)
+            else:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_bb = _prepare_4d_attention_mask(attention_mask_b, hidden_states_b.dtype)
+
+        if attention_mask_c is not None:
+            if self._use_flash_attention_2:
+                attention_mask_cc = attention_mask_c if 0 in attention_mask_c else None
+            elif self._use_sdpa and head_mask_c is None and not output_attentions:
+                # output_attentions=True & head_mask can not be supported when using SDPA, fall back to
+                # the manual implementation that requires a 4D causal mask in all cases.
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_cc = _prepare_4d_attention_mask_for_sdpa(attention_mask_c, hidden_states_c.dtype)
+            else:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask_cc = _prepare_4d_attention_mask(attention_mask_c, hidden_states_c.dtype)
+
+        # expand cross attention mask
+        if self.has_inter:
+            if self._use_flash_attention_2:
+                cross_attention_mask_ac = attention_mask_c if 0 in attention_mask_c else None
+            elif self._use_sdpa and cross_attn_head_mask_ac is None and not output_attentions:
+                # output_attentions=True & cross_attn_head_mask can not be supported when using SDPA, and we fall back on
+                # the manual implementation that requires a 4D causal mask in all cases.
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                cross_attention_mask_ac = _prepare_4d_attention_mask_for_sdpa(
+                    attention_mask_c,
+                    hidden_states_a.dtype,
+                    tgt_len=input_shape_a[-1],
+                )
+            else:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                cross_attention_mask_ac = _prepare_4d_attention_mask(
+                    attention_mask_c, hidden_states_a.dtype, tgt_len=input_shape_a[-1]
+                )
+
+            if self._use_flash_attention_2:
+                cross_attention_mask_bc = attention_mask_c if 0 in attention_mask_c else None
+            elif self._use_sdpa and cross_attn_head_mask_bc is None and not output_attentions:
+                # output_attentions=True & cross_attn_head_mask can not be supported when using SDPA, and we fall back on
+                # the manual implementation that requires a 4D causal mask in all cases.
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                cross_attention_mask_bc = _prepare_4d_attention_mask_for_sdpa(
+                    attention_mask_c,
+                    hidden_states_b.dtype,
+                    tgt_len=input_shape_b[-1],
+                )
+            else:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                cross_attention_mask_bc = _prepare_4d_attention_mask(
+                    attention_mask_c, hidden_states_b.dtype, tgt_len=input_shape_b[-1]
+                )
+
+        # hidden_states: batch_size, seq_len, embed_dim
+        if self.layer_norm_type != "pre":
+            if self.has_intra:
+                hidden_states_a = self.embed_layer_norm_a(hidden_states_a)
+                hidden_states_b = self.embed_layer_norm_b(hidden_states_b)
+            if self.has_inter:
+                hidden_states_ac = self.embed_layer_norm_a(hidden_states_a)
+                hidden_states_bc = self.embed_layer_norm_b(hidden_states_b)
+            if self.has_intra or self.has_inter:
+                hidden_states_c = self.embed_layer_norm_c(hidden_states_c)
+        elif self.has_inter:
+            hidden_states_ac = hidden_states_a
+            hidden_states_bc = hidden_states_b
+        if self.has_intra:
+            hidden_states_a = nn.functional.dropout(hidden_states_a, p=self.dropout, training=self.training)
+            hidden_states_b = nn.functional.dropout(hidden_states_b, p=self.dropout, training=self.training)
+
+        if self.has_inter:
+            hidden_states_ac = nn.functional.dropout(hidden_states_ac, p=self.dropout, training=self.training)
+            hidden_states_bc = nn.functional.dropout(hidden_states_bc, p=self.dropout, training=self.training)
+
+        if self.has_intra or self.has_inter:
+            hidden_states_c = nn.functional.dropout(hidden_states_c, p=self.dropout, training=self.training)
+
+
+        all_self_encoder_states = () if output_hidden_states else None
+        all_cross_encoder_states = () if output_hidden_states else None
+        all_self_attentions = () if output_attentions else None
+        all_cross_attentions = () if output_attentions else None
+        next_cache = () if use_cache else None
+        next_cross_cache = () if use_cache else None
+
+        # check if head_mask has a correct number of layers specified if desired
+        if self.has_intra:
+            if head_mask_a is not None:
+                if head_mask_a.size()[0] != (len(self.self_layers_a)):
+                    raise ValueError(
+                        f"The head_mask_a should be specified for {len(self.self_layers_a)} layers, but it is for"
+                        f" {head_mask_a.size()[0]}."
+                    )
+            if head_mask_b is not None:
+                if head_mask_b.size()[0] != (len(self.self_layers_b)):
+                    raise ValueError(
+                        f"The head_mask_b should be specified for {len(self.self_layers_b)} layers, but it is for"
+                        f" {head_mask_b.size()[0]}."
+                    )
+            if head_mask_c is not None:
+                if head_mask_c.size()[0] != (len(self.self_layers_c)):
+                    raise ValueError(
+                        f"The head_mask_c should be specified for {len(self.self_layers_c)} layers, but it is for"
+                        f" {head_mask_c.size()[0]}."
+                    )
+        if self.has_inter:
+            if cross_attn_head_mask_ac is not None:
+                if cross_attn_head_mask_ac.size()[0] != (len(self.cross_layers_ac)):
+                    raise ValueError(
+                        f"The cross_attn_head_mask_ac should be specified for {len(self.cross_layers_ac)} layers, but it is for"
+                        f" {cross_attn_head_mask_ac.size()[0]}."
+                    )
+
+            if cross_attn_head_mask_bc is not None:
+                if cross_attn_head_mask_bc.size()[0] != (len(self.cross_layers_bc)):
+                    raise ValueError(
+                        f"The cross_attn_head_mask_bc should be specified for {len(self.cross_layers_bc)} layers, but it is for"
+                        f" {cross_attn_head_mask_bc.size()[0]}."
+                    )
+
+        if self.has_intra:
+            for idx in range(self.config.self_encoder_layers):
+                if output_hidden_states:
+                    all_self_encoder_states = all_self_encoder_states + ([hidden_states_a, hidden_states_b, hidden_states_c], )
+                self_encoder_layer_a = self.self_layers_a[idx]
+                self_encoder_layer_b = self.self_layers_b[idx]
+                self_encoder_layer_c = self.self_layers_c[idx]
+                # add layer_dropout (see https://arxiv.org/abs/1909.11556 for description)
+                to_drop = False
+                if self.training and self.layer_dropout > 0.0:
+                    dropout_probability = torch.rand([])
+                    # skip the layer
+                    if dropout_probability < self.layer_dropout:
+                        to_drop = True
+
+                if to_drop:
+                    layer_outputs_a = (None, None, None)
+                    layer_outputs_b = (None, None, None)
+                    layer_outputs_c = (None, None, None)
+                else:
+                    past_key_value_a = past_key_values[idx][0] if past_key_values is not None else None
+                    past_key_value_b = past_key_values[idx][1] if past_key_values is not None else None
+                    past_key_value_c = past_key_values[idx][2] if past_key_values is not None else None
+                    if self.gradient_checkpointing and self.training:
+                        layer_outputs_a = self._gradient_checkpointing_func(
+                            self_encoder_layer_a.__call__,
+                            hidden_states_a,
+                            attention_mask_aa,
+                            None,
+                            None,
+                            (head_mask_a[idx] if head_mask_a is not None else None),
+                            None,
+                            past_key_value_a,
+                            None,
+                            output_attentions,
+                            use_cache
+                        )
+                        layer_outputs_b = self._gradient_checkpointing_func(
+                            self_encoder_layer_b.__call__,
+                            hidden_states_b,
+                            attention_mask_bb,
+                            None,
+                            None,
+                            (head_mask_b[idx] if head_mask_b is not None else None),
+                            None,
+                            past_key_value_b,
+                            None,
+                            output_attentions,
+                            use_cache
+                        )
+                        layer_outputs_c = self._gradient_checkpointing_func(
+                            self_encoder_layer_c.__call__,
+                            hidden_states_c,
+                            attention_mask_cc,
+                            None,
+                            None,
+                            (head_mask_c[idx] if head_mask_c is not None else None),
+                            None,
+                            past_key_value_c,
+                            None,
+                            output_attentions,
+                            use_cache
+                        )
+                    else:
+                        layer_outputs_a = self_encoder_layer_a(
+                            hidden_states_a,
+                            attention_mask_aa,
+                            None,
+                            None,
+                            layer_head_mask=(head_mask_a[idx] if head_mask_a is not None else None),
+                            cross_attn_layer_head_mask=None,
+                            past_key_value=past_key_value_a,
+                            cross_past_key_value=None,
+                            output_attentions=output_attentions,
+                            use_cache=use_cache,
+                        )
+                        layer_outputs_b = self_encoder_layer_b(
+                            hidden_states_b,
+                            attention_mask_bb,
+                            None,
+                            None,
+                            layer_head_mask=(head_mask_b[idx] if head_mask_b is not None else None),
+                            cross_attn_layer_head_mask=None,
+                            past_key_value=past_key_value_b,
+                            cross_past_key_value=None,
+                            output_attentions=output_attentions,
+                            use_cache=use_cache,
+                        )
+                        layer_outputs_c = self_encoder_layer_c(
+                            hidden_states_c,
+                            attention_mask_cc,
+                            None,
+                            None,
+                            layer_head_mask=(head_mask_c[idx] if head_mask_c is not None else None),
+                            cross_attn_layer_head_mask=None,
+                            past_key_value=past_key_value_c,
+                            cross_past_key_value=None,
+                            output_attentions=output_attentions,
+                            use_cache=use_cache,
+                        )
+                    hidden_states_a = layer_outputs_a[0]
+                    hidden_states_b = layer_outputs_b[0]
+                    hidden_states_c = layer_outputs_c[0]
+
+                if output_attentions:
+                    all_self_attentions = all_self_attentions + ([layer_outputs_a[1], layer_outputs_b[1], layer_outputs_c[1]], )
+
+                if use_cache:
+                    next_cache += ([
+                                       layer_outputs_a[2 if output_attentions else 1],
+                                       layer_outputs_b[2 if output_attentions else 1],
+                                       layer_outputs_c[2 if output_attentions else 1]
+                                   ], )
+
+        if self.has_inter:
+            for idx in range(self.config.cross_encoder_layers):
+                if output_hidden_states:
+                    all_cross_encoder_states = all_cross_encoder_states + ([hidden_states_ac, hidden_states_bc], )
+                cross_encoder_layer_ac = self.cross_layers_ac[idx]
+                cross_encoder_layer_bc = self.cross_layers_bc[idx]
+                # add layer_dropout (see https://arxiv.org/abs/1909.11556 for description)
+                to_drop = False
+                if self.training and self.layer_dropout > 0.0:
+                    dropout_probability = torch.rand([])
+                    # skip the layer
+                    if dropout_probability < self.layer_dropout:
+                        to_drop = True
+
+                if to_drop:
+                    layer_outputs_ac = (None, None, None)
+                    layer_outputs_bc = (None, None, None)
+                else:
+                    cross_past_key_value_ac = cross_past_key_values[idx][2] if cross_past_key_values is not None else None
+                    cross_past_key_value_bc = cross_past_key_values[idx][4] if cross_past_key_values is not None else None
+                    if self.gradient_checkpointing and self.training:
+
+                        layer_outputs_ac = self._gradient_checkpointing_func(
+                            cross_encoder_layer_ac.__call__,
+                            hidden_states_ac,
+                            attention_mask_aa,
+                            hidden_states_c,
+                            cross_attention_mask_ac,
+                            None,
+                            (cross_attn_head_mask_ac[idx] if cross_attn_head_mask_ac is not None else None),
+                            None,
+                            cross_past_key_value_ac,
+                            output_attentions,
+                            use_cache
+                        )
+
+                        layer_outputs_bc = self._gradient_checkpointing_func(
+                            cross_encoder_layer_bc.__call__,
+                            hidden_states_bc,
+                            attention_mask_bb,
+                            hidden_states_c,
+                            cross_attention_mask_bc,
+                            None,
+                            (cross_attn_head_mask_bc[idx] if cross_attn_head_mask_bc is not None else None),
+                            None,
+                            cross_past_key_value_bc,
+                            output_attentions,
+                            use_cache
+                        )
+                    else:
+                        layer_outputs_ac = cross_encoder_layer_ac(
+                            hidden_states_ac,
+                            attention_mask_aa,
+                            hidden_states_c,
+                            cross_attention_mask_ac,
+                            None,
+                            (cross_attn_head_mask_ac[idx] if cross_attn_head_mask_ac is not None else None),
+                            None,
+                            cross_past_key_value_ac,
+                            output_attentions,
+                            use_cache
+                        )
+                        layer_outputs_bc = cross_encoder_layer_bc(
+                            hidden_states_bc,
+                            attention_mask_bb,
+                            hidden_states_c,
+                            cross_attention_mask_bc,
+                            None,
+                            (cross_attn_head_mask_bc[idx] if cross_attn_head_mask_bc is not None else None),
+                            None,
+                            cross_past_key_value_bc,
+                            output_attentions,
+                            use_cache
+                        )
+                    hidden_states_ac = layer_outputs_ac[0]
+                    hidden_states_bc = layer_outputs_bc[0]
+
+                if output_attentions:
+                    all_cross_attentions = all_cross_attentions + ([layer_outputs_ac[1],layer_outputs_bc[1]], )
+
+                if use_cache:
+                    next_cross_cache += ([layer_outputs_ac[2 if output_attentions else 1],
+                                          layer_outputs_bc[2 if output_attentions else 1],],
+                                         )
+
+        if self.layer_norm_type == "pre":
+            if self.has_intra:
+                hidden_states_a = self.last_layer_norm_a(hidden_states_a)
+                hidden_states_b = self.last_layer_norm_b(hidden_states_b)
+
+            if self.has_inter:
+                hidden_states_ac = self.last_layer_norm_ac(hidden_states_ac)
+                hidden_states_bc = self.last_layer_norm_bc(hidden_states_bc)
+
+            if self.has_intra and self.has_inter:
+                hidden_states_c = self.last_layer_norm_c(hidden_states_c)
+
+        if output_hidden_states:
+            if self.has_intra:
+                all_self_encoder_states = all_self_encoder_states + ([hidden_states_a, hidden_states_b, hidden_states_c],)
+            else:
+                all_self_encoder_states = None
+            if self.has_inter:
+                all_cross_encoder_states = all_cross_encoder_states + ([ hidden_states_ac, hidden_states_bc], )
+            else:
+                all_cross_encoder_states = None
+
+        next_cache = [next_cache, next_cross_cache] if use_cache else None
+        if not return_dict:
+            if self.has_intra and self.has_inter:
+                return tuple(v for v in [
+                    [
+                        hidden_states_a, hidden_states_b, hidden_states_c,
+                        hidden_states_ac,
+                        hidden_states_bc,
+                    ],
+                    [all_self_encoder_states, all_cross_encoder_states],
+                    next_cache,
+                    all_self_attentions, all_cross_attentions
+                ] if v is not None)
+            elif self.has_intra:
+                return tuple(v for v in [
+                    [
+                        hidden_states_a, hidden_states_b, hidden_states_c,
+                        None, None,
+                        None, None,
+                        None, None
+                    ],
+                    [all_self_encoder_states, None],
+                    next_cache,
+                    all_self_attentions, None
+                ] if v is not None)
+            else:
+                return tuple(v for v in [
+                    [
+                        None, None, None,
+                        hidden_states_ac,
+                        hidden_states_bc,
+                    ],
+                    [None, all_cross_encoder_states],
+                    next_cache,
+                    None, all_cross_attentions
+                ] if v is not None)
+        if self.has_intra and self.has_inter:
+            return BaseModelOutputWithPastAndCrossAttentions(
+                last_hidden_state=[
+                    hidden_states_a, hidden_states_b, hidden_states_c,
+                    hidden_states_ac,
+                    hidden_states_bc,
+                ],
+                hidden_states=[all_self_encoder_states, all_cross_encoder_states],
+                past_key_values=next_cache,
+                attentions=all_self_attentions,
+                cross_attentions=all_cross_attentions,
+            )
+        elif self.has_intra:
+            return BaseModelOutputWithPastAndCrossAttentions(
+                last_hidden_state=[
+                    hidden_states_a, hidden_states_b, hidden_states_c,
+                    None, None,
+                    None, None,
+                    None, None
+                ],
+                hidden_states=[all_self_encoder_states, None],
+                past_key_values=next_cache,
+                attentions=all_self_attentions,
+                cross_attentions=None,
+            )
+        else:
+            return BaseModelOutputWithPastAndCrossAttentions(
+                last_hidden_state=[
+                    None, None, None,
+                    hidden_states_ac,
+                    hidden_states_bc,
+                ],
+                hidden_states=[None, all_cross_encoder_states],
+                past_key_values=next_cache,
+                attentions=None,
+                cross_attentions=all_cross_attentions,
+            )

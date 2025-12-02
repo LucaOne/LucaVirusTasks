@@ -48,6 +48,7 @@ try:
     from lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
     from lucatriple.models.LucaTripleIntra import LucaTripleIntra
     from lucatriple.models.LucaTripleInter import LucaTripleInter
+    from lucatriple.models.LucaTripleInterV2 import LucaTripleInterV2
 except ImportError:
     from src.utils import to_device, device_memory, available_gpu_id, load_labels, seq_type_is_match_seq, \
         download_trained_checkpoint_lucaone, download_trained_checkpoint_lucavirus, \
@@ -72,6 +73,7 @@ except ImportError:
     from src.lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
     from src.lucatriple.models.LucaTripleIntra import LucaTripleIntra
     from src.lucatriple.models.LucaTripleInter import LucaTripleInter
+    from src.lucatriple.models.LucaTripleInterV2 import LucaTripleInterV2
 
 
 def transform_one_sample_2_feature(
@@ -903,6 +905,8 @@ def load_model(
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleIntra
     elif args.model_type in ["lucatriple_inter"]:
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleInter
+    elif args.model_type in ["lucatriple_inter_v2"]:
+        config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaTripleInterV2
     elif args.model_type in ["lucatriple_intrainter"]:
         config_class, seq_tokenizer_class, model_class = BertConfig, Alphabet, LucaPairIntraInter
     elif args.model_type in ["lucatriple_homo"]:
@@ -1312,7 +1316,7 @@ def get_args():
                             "lucabase",
                             "lucapair_homo", "lucapair_heter",
                             "lucatriple_homo", "lucatriple_heter",
-                            "lucatriple_intra", "lucatriple_inter", "lucatriple_intrainter"
+                            "lucatriple_intra", "lucatriple_inter", "lucatriple_inter_v2", "lucatriple_intrainter"
                         ],
                         help="the model type.")
     parser.add_argument("--input_type", default=None, type=str, required=True, 

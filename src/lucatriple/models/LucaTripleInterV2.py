@@ -7,7 +7,7 @@
 @tel: 137****6540
 @datetime: 2023/6/21 17:32
 @project: LucaVirusTasks
-@file: LucaTripleIntraInter
+@file: LucaTripleIntraInterV2
 @desc: xxxx
 """
 
@@ -23,7 +23,7 @@ try:
     from utils import *
     from common.multi_label_metrics import *
     from common.metrics import *
-    from common.luca_triple import LucaTriple
+    from common.luca_triple import LucaTripleV2
     from common.modeling_bert import BertModel, BertPreTrainedModel
 except ImportError:
     from src.common.pooling import *
@@ -31,14 +31,14 @@ except ImportError:
     from src.utils import *
     from src.common.multi_label_metrics import *
     from src.common.metrics import *
-    from src.common.luca_triple import LucaTriple
+    from src.common.luca_triple import LucaTripleV2
     from src.common.modeling_bert import BertModel, BertPreTrainedModel
 logger = logging.getLogger(__name__)
 
 
-class LucaTripleInter(BertPreTrainedModel):
+class LucaTripleInterV2(BertPreTrainedModel):
     def __init__(self, config, args):
-        super(LucaTripleInter, self).__init__(config)
+        super(LucaTripleInterV2, self).__init__(config)
         config.has_intra = False
         config.has_inter = True
         self.input_type = args.input_type
@@ -58,14 +58,14 @@ class LucaTripleInter(BertPreTrainedModel):
             self.linear_c = nn.Linear(config.embedding_input_size_c, config.hidden_size, bias=True)
         else:
             self.linear_c = None
-        self.encoder = LucaTriple(config)
+        self.encoder = LucaTripleV2(config)
         config.embedding_input_size = config.hidden_size
-        self.pooler = nn.ModuleList([create_pooler(pooler_type="matrix", config=config, args=args) for _ in range(6)])
+        self.pooler = nn.ModuleList([create_pooler(pooler_type="matrix", config=config, args=args) for _ in range(2)])
         self.dropout, self.hidden_layer, self.hidden_act, self.classifier, self.output, self.loss_fct = \
             create_loss_function(
                 config,
                 args,
-                hidden_size=6 * config.hidden_size if self.fusion_type == "concat" else config.hidden_size,
+                hidden_size=2 * config.hidden_size if self.fusion_type == "concat" else config.hidden_size,
                 classifier_size=args.classifier_size,
                 sigmoid=args.sigmoid,
                 output_mode=args.output_mode,
@@ -136,14 +136,10 @@ class LucaTripleInter(BertPreTrainedModel):
             hidden_states_c=hidden_states_c,
             attention_mask_c=matrix_attention_masks_c,
             head_mask_a=None,
-            cross_attn_head_mask_ab=None,
             cross_attn_head_mask_ac=None,
             head_mask_b=None,
-            cross_attn_head_mask_ba=None,
             cross_attn_head_mask_bc=None,
             head_mask_c=None,
-            cross_attn_head_mask_ca=None,
-            cross_attn_head_mask_cb=None,
             past_key_values=None,
             cross_past_key_values=None,
             use_cache=False,
@@ -160,27 +156,15 @@ class LucaTripleInter(BertPreTrainedModel):
                     cur_cross_attention = cur_cross_attention + (
                         layer[0][sample_idx],
                         layer[1][sample_idx],
-                        layer[2][sample_idx],
-                        layer[3][sample_idx],
-                        layer[4][sample_idx],
-                        layer[5][sample_idx]
                     )
-                filepath = os.path.join(attention_scores_savepath, "%s_seq_attention_scores.pt" % sample_ids[sample_idx])
+                filepath = os.path.join(attention_scores_savepath, "%s_seq_attention_scores_v2.pt" % sample_ids[sample_idx])
                 torch.save(cross_attentions, filepath)
 
         last_hidden_states = [
-            # ab
-            self.pooler[0](last_hidden_states[3], seq_attention_masks_a),
-            # ba
-            self.pooler[1](last_hidden_states[4], seq_attention_masks_b),
             # ac
-            self.pooler[2](last_hidden_states[5], seq_attention_masks_a),
-            # ca
-            self.pooler[3](last_hidden_states[6], seq_attention_masks_c),
+            self.pooler[0](last_hidden_states[3], seq_attention_masks_a),
             # bc
-            self.pooler[4](last_hidden_states[7], seq_attention_masks_b),
-            # cb
-            self.pooler[5](last_hidden_states[8], seq_attention_masks_c),
+            self.pooler[1](last_hidden_states[4], seq_attention_masks_b),
         ]
 
         if self.dropout is not None:
