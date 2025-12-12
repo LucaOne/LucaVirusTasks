@@ -50,9 +50,77 @@ python predict_v2.py \
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 python predict_v2.py \
     --seq_type prot \
+    --input_file ../data/antibody_attention/dev_alpha_rbd.csv \
+    --llm_truncation_seq_length 4096 \
+    --emb_dir ../../matrices/DeepAbBindv2_original_predicted/lucavirus/v1.0/3800000 \
+    --model_path .. \
+    --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_alpha_rbd.csv \
+    --dataset_name DeepAbBindv2_original \
+    --dataset_type protein_protein_protein \
+    --task_type binary_class \
+    --task_level_type seq_level \
+    --model_type lucatriple_inter \
+    --input_type matrix \
+    --input_mode triple \
+    --time_str 20251206194537 \
+    --step 25188 \
+    --threshold 0.5 \
+    --output_attention_scores_dirpath ../predicted/attention_scores/dev_alpha_rbd \
+    --print_per_num 1000 \
+    --gpu_id 0
+
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+python predict_v2.py \
+    --seq_type prot \
+    --input_file ../data/antibody_attention/dev_omicron_rbd.csv \
+    --llm_truncation_seq_length 4096 \
+    --emb_dir ../../matrices/DeepAbBindv2_original_predicted/lucavirus/v1.0/3800000 \
+    --model_path .. \
+    --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_omicron_rbd.csv \
+    --dataset_name DeepAbBindv2_original \
+    --dataset_type protein_protein_protein \
+    --task_type binary_class \
+    --task_level_type seq_level \
+    --model_type lucatriple_inter \
+    --input_type matrix \
+    --input_mode triple \
+    --time_str 20251206194537 \
+    --step 25188 \
+    --threshold 0.5 \
+    --output_attention_scores_dirpath ../predicted/attention_scores/dev_omicron_rbd \
+    --print_per_num 1000 \
+    --gpu_id 1
+
+
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+python predict_v2.py \
+    --seq_type prot \
+    --input_file ../data/antibody_attention/dev_wt_ntd.csv \
+    --llm_truncation_seq_length 4096 \
+    --emb_dir ../../matrices/DeepAbBindv2_original_predicted/lucavirus/v1.0/3800000 \
+    --model_path .. \
+    --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_wt_ntd.csv \
+    --dataset_name DeepAbBindv2_original \
+    --dataset_type protein_protein_protein \
+    --task_type binary_class \
+    --task_level_type seq_level \
+    --model_type lucatriple_inter \
+    --input_type matrix \
+    --input_mode triple \
+    --time_str 20251206194537 \
+    --step 25188 \
+    --threshold 0.5 \
+    --output_attention_scores_dirpath ../predicted/attention_scores/dev_wt_ntd \
+    --print_per_num 1000 \
+    --gpu_id 2
+
+
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+python predict_v2.py \
+    --seq_type prot \
     --input_file ../data/antibody_attention/dev_wt_rbd.csv \
     --llm_truncation_seq_length 4096 \
-    --emb_dir ../../matrices/DeepAbBindv2_original/lucavirus/v1.0/3800000 \
+    --emb_dir ../../matrices/DeepAbBindv2_original_predicted/lucavirus/v1.0/3800000 \
     --model_path .. \
     --save_path ../predicted/DeepAbBindv2_original/lucavirus_dev_wt_rbd.csv \
     --dataset_name DeepAbBindv2_original \
@@ -62,12 +130,9 @@ python predict_v2.py \
     --model_type lucatriple_inter \
     --input_type matrix \
     --input_mode triple \
-    --time_str 20251117111814 \
-    --step 90257 \
+    --time_str 20251206194537 \
+    --step 25188 \
     --threshold 0.5 \
-    --matrix_embedding_exists \
     --output_attention_scores_dirpath ../predicted/attention_scores/dev_wt_rbd \
     --print_per_num 1000 \
-    --gpu_id 1
-
-
+    --gpu_id 3

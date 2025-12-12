@@ -49,7 +49,7 @@ try:
     from lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
     from lucatriple.models.LucaTripleIntra import LucaTripleIntra
     from lucatriple.models.LucaTripleInter import LucaTripleInter
-    from lucatriple.models.LucaTripleInter import LucaTripleInterV2
+    from lucatriple.models.LucaTripleInterV2 import LucaTripleInterV2
 except ImportError:
     from src.utils import to_device, device_memory, available_gpu_id, load_labels, seq_type_is_match_seq, \
         download_trained_checkpoint_lucaone, download_trained_checkpoint_lucavirus, \
@@ -74,7 +74,7 @@ except ImportError:
     from src.lucatriple.models.LucaTripleIntraInter import LucaTripleIntraInter
     from src.lucatriple.models.LucaTripleIntra import LucaTripleIntra
     from src.lucatriple.models.LucaTripleInter import LucaTripleInter
-    from src.lucatriple.models.LucaTripleInter import LucaTripleInterV2
+    from src.lucatriple.models.LucaTripleInterV2 import LucaTripleInterV2
 
 
 
