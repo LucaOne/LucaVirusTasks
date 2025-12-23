@@ -21,9 +21,9 @@ import argparse
 from collections import OrderedDict
 from subword_nmt.apply_bpe import BPE
 from transformers import BertConfig
-sys.path.append(".")
 sys.path.append("..")
-sys.path.append("../src")
+sys.path.append("../..")
+sys.path.append("../../src")
 try:
     from utils import to_device, device_memory, available_gpu_id, load_labels, seq_type_is_match_seq,\
         download_trained_checkpoint_lucaone, download_trained_checkpoint_lucavirus, \
@@ -1460,7 +1460,7 @@ if __name__ == "__main__":
                 print("save_path=%s exists." % run_args.save_path)
                 if run_args.input_mode == "triple":
                     for row in csv_reader(run_args.save_path, header=True, header_filter=True):
-                        if len(row) < 8:
+                        if len(row) < 9:
                             continue
                         exists_ids.add(row[0] + "_" + row[1] + "_" + row[2])
                         exists_res.append(row)
@@ -1825,178 +1825,4 @@ if __name__ == "__main__":
     else:
         raise Exception("input error, usage: --hep")
 
-"""
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir ../predicted/LucaVirus/DeepAbBindv2/embedding/lucavirus_test_original_drop_weak \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/lucavirus_test_original_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_original \
-    --dataset_type protein_protein_protein \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250117131337 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 2
-    
-    
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --input_file ../data/DeepAbBindv2/test_nucl_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir /mnt2/sanyuan.hy/matrices/DeepAbBindv2/lucavirus/v1.0/20240815023346/3800000 \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/lucavirus_test_nucl_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_nucl \
-    --dataset_type protein_protein_gene \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250127174006 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 2 \
-    --matrix_embedding_exists
-    
-export CUDA_VISIBLE_DEVICES="0,1"
-python testing_checkpoints.py \
-    --input_file ../data/DeepAbBindv2/test_genome_drop_weak.csv \
-    --llm_truncation_seq_length 29905 \
-    --emb_dir /mnt/sanyuan.hy/matrices/DeepAbBindv2/lucavirus/v1.0/20240815023346/3800000 \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/lucavirus_test_genome_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_genome \
-    --dataset_type protein_protein_gene \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250124160316 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 0 \
-    --matrix_embedding_exists
-     
-##############
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir ../predicted/LucaVirus/DeepAbBindv2/embedding/lucaone_test_original_drop_weak \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/lucaone_test_original_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_original \
-    --dataset_type protein_protein_protein \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250212151653 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 2
-    
-##############
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir ../predicted/LucaVirus/DeepAbBindv2/embedding/esm2_test_original_drop_weak \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/esm2_test_original_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_original \
-    --dataset_type protein_protein_protein \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250213112316 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 2
-    
-##############
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir /mnt2/sanyuan.hy/matrices/DeepAbBindv2/esm/esmc/600M \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/esmc_test_original_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_original \
-    --dataset_type protein_protein_protein \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250213182923 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 2
-    
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python predict_v2.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir ../predicted/LucaVirus/DeepAbBindv2/embedding/test_original_drop_weak \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/test_original_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_original \
-    --dataset_type protein_protein_protein \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250117131337 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --step 90257 \
-    --print_per_num 1000 \
-    --gpu_id 1
-    
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python testing_checkpoints.py \
-    --seq_type prot \
-    --input_file ../data/DeepAbBindv2/test_original_drop_weak.csv \
-    --llm_truncation_seq_length 4096 \
-    --emb_dir ../predicted/LucaVirus/DeepAbBindv2/embedding/test_nucl_drop_weak \
-    --model_path .. \
-    --save_path ../predicted/LucaVirus/DeepAbBindv2/test_nucl_drop_weak_predicted_results.csv \
-    --dataset_name DeepAbBindv2_nucl \
-    --dataset_type protein_protein_gene \
-    --task_type binary_class \
-    --task_level_type seq_level \
-    --model_type lucatriple_heter \
-    --input_type matrix \
-    --input_mode triple \
-    --time_str 20250127174006 \
-    --ground_truth_idx 9 \
-    --threshold 0.5 \
-    --print_per_num 1000 \
-    --gpu_id 1
-"""
 
