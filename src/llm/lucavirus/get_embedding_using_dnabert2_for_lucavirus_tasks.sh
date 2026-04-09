@@ -26,12 +26,12 @@ python inference_embedding.py \
     --embedding_type matrix \
     --matrix_add_special_token \
     --embedding_complete \
-    --gpu_id 0
+    --gpu_id 2
 
 
-cd ./src/llm/esm
+cd ./src/llm/esm2/
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python get_embedding.py \
+python predict_embedding.py \
     --llm_type esm2 \
     --llm_version 3B \
     --truncation_seq_length 10240 \
@@ -58,14 +58,12 @@ python inference_embedding.py \
     --embedding_type matrix \
     --matrix_add_special_token \
     --embedding_complete \
-    --embedding_complete_seg_overlap \
-    --embedding_fixed_len_a_time 10240 \
     --gpu_id 0
 
 
-cd ./src/llm/esm
+cd ./src/llm/esm2/
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python get_embedding.py \
+python predict_embedding.py \
     --llm_type esm2 \
     --llm_version 3B \
     --truncation_seq_length 10240 \

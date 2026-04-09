@@ -137,7 +137,7 @@ python get_embedding.py \
     --embedding_complete \
     --embedding_complete_seg_overlap \
     --embedding_fixed_len_a_time 10240 \
-    --gpu_id 0
+    --gpu_id 3
 
 # 255 机器
 cd ./src/llm/lucavirus
@@ -159,9 +159,9 @@ python get_embedding.py \
     --embedding_complete \
     --embedding_complete_seg_overlap \
     --embedding_fixed_len_a_time 10240 \
-    --gpu_id 0
+    --gpu_id 3
 
-255机器
+# 255机器
 # DeepAbBindv2_nucl
 cd ./src/llm/lucavirus
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
@@ -184,7 +184,7 @@ python get_embedding.py \
     --embedding_fixed_len_a_time 10240 \
     --gpu_id 3
 
-255机器
+# 255机器
 cd ./src/llm/lucavirus
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 python get_embedding.py \
@@ -206,7 +206,7 @@ python get_embedding.py \
     --embedding_fixed_len_a_time 10240 \
     --gpu_id 3
 
-255机器
+# 255机器
 # DeepAbBindv2_original
 cd ./src/llm/lucavirus
 export CUDA_VISIBLE_DEVICES="0,1,2,3"

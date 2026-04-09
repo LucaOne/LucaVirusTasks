@@ -1,6 +1,6 @@
 # 129机器
 # VirusEC4
-cd ./src/llm/esm
+cd ./src/llm/esm2/
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 python predict_embedding.py \
    --llm_type esm2 \
@@ -19,7 +19,7 @@ python predict_embedding.py \
 
 # 255机器
 # VirusEC4
-cd ./src/llm/esmc
+cd ./src/llm/esmc/
 python predict_embedding.py \
     --llm_type esmc \
     --llm_version 600M \
@@ -37,7 +37,7 @@ python predict_embedding.py \
 
 # 142机器
 # ViralCapsid
-cd ./src/llm/esm
+cd ./src/llm/esm2/
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 python predict_embedding.py \
    --llm_type esm2 \
@@ -191,7 +191,7 @@ python predict_embedding.py \
    --trunc_type right \
    --seq_type prot \
    --input_file ../../../dataset/DMS_EVA/protein/regression/all_proteins.fasta \
-   --save_path  ../../../../matrices/DeepDMS_EVAAbBindv2_original/esm/esm2/3B \
+   --save_path  ../../../../matrices/DMS_EVA/esm/esm2/3B \
    --embedding_type matrix \
    --matrix_add_special_token \
    --embedding_complete \
